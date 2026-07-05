@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/work-event.schema.json",
+  "title": "Normalized Work Event Collection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "events"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "exportedAt": { "type": "string", "format": "date-time" },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/workEvent" }
+    }
+  },
+  "$defs": {
+    "workEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "caseId",
+        "timestamp",
+        "activity",
+        "actor",
+        "result",
+        "truthState",
+        "provenance"
+      ],
+      "properties": {
+        "eventId": { "type": "string", "minLength": 1 },
+        "caseId": { "type": "string", "minLength": 1 },
+        "traceId": { "type": "string" },
+        "parentEventId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "intent": { "type": "string" },
+        "activity": { "$ref": "#/$defs/activity" },
+        "transition": { "$ref": "#/$defs/transition" },
+        "actor": { "$ref": "#/$defs/actor" },
+        "system": { "$ref": "#/$defs/system" },
+        "objects": { "type": "array", "items": { "$ref": "#/$defs/objectRef" } },
+        "decision": { "$ref": "#/$defs/decision" },
+        "result": { "$ref": "#/$defs/result" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/resourceMeasurement" }
+        },
+        "acceptedOutcome": { "type": "boolean" },
+        "truthState": { "$ref": "#/$defs/truthState" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "type"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "type": {
+          "enum": [
+            "intake",
+            "extract",
+            "validate",
+            "decide",
+            "review",
+            "execute",
+            "handoff",
+            "reconcile",
+            "close",
+            "other"
+          ]
+        },
+        "primitiveVersion": { "type": "string" }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fromState": { "type": "string" },
+        "toState": { "type": "string" }
+      },
+      "anyOf": [{ "required": ["fromState"] }, { "required": ["toState"] }]
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "type"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["human", "agent", "system", "service-account", "external"] },
+        "role": { "type": "string" },
+        "authorityLevel": { "type": "integer", "minimum": 1, "maximum": 7 }
+      }
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "version": { "type": "string" },
+        "tool": { "type": "string" },
+        "model": { "type": "string" }
+      }
+    },
+    "objectRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "role"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["input", "output", "subject", "evidence"] },
+        "sourceRef": { "type": "string" },
+        "classification": { "type": "string" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "selectedPath"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "selectedPath": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string" },
+        "ruleRef": { "type": "string" },
+        "decidingAuthority": { "type": "string" }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["success", "failure", "exception", "retry", "rollback", "cancelled"]
+        },
+        "reasonCode": { "type": "string" },
+        "message": { "type": "string" },
+        "retryCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceRef"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "sourceRef": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "classification": { "type": "string" },
+        "contentHash": { "type": "string" }
+      }
+    },
+    "resourceMeasurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value", "unit", "measurementClass", "sourceRef"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "financial",
+            "input-tokens",
+            "output-tokens",
+            "cached-tokens",
+            "reasoning-tokens",
+            "human-time",
+            "electricity",
+            "water",
+            "compute",
+            "storage",
+            "network"
+          ]
+        },
+        "value": { "type": ["number", "null"], "minimum": 0 },
+        "unit": { "type": "string", "minLength": 1 },
+        "measurementClass": {
+          "enum": ["metered", "provider-reported", "allocated", "estimated", "unknown"]
+        },
+        "sourceRef": { "type": "string", "minLength": 1 },
+        "allocationMethod": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "notes": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "measurementClass": { "const": "unknown" } },
+            "required": ["measurementClass"]
+          },
+          "then": { "properties": { "value": { "type": "null" } } },
+          "else": { "properties": { "value": { "type": "number", "minimum": 0 } } }
+        },
+        {
+          "if": {
+            "properties": { "measurementClass": { "enum": ["allocated", "estimated"] } },
+            "required": ["measurementClass"]
+          },
+          "then": { "required": ["allocationMethod"] }
+        }
+      ]
+    },
+    "truthState": { "enum": ["observed", "inferred", "user-confirmed", "overridden"] },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceType", "sourceRef", "ingestedAt"],
+      "properties": {
+        "sourceType": {
+          "enum": [
+            "mnemosync",
+            "file-import",
+            "opentelemetry",
+            "elastic",
+            "opensearch",
+            "manual",
+            "derived"
+          ]
+        },
+        "sourceRef": { "type": "string", "minLength": 1 },
+        "ingestedAt": { "type": "string", "format": "date-time" },
+        "transformation": { "type": "string" },
+        "contentHash": { "type": "string" }
+      }
+    }
+  }
+}

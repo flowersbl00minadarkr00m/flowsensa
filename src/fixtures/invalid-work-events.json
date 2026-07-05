@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0.0",
+  "exportedAt": "not-a-date",
+  "events": [
+    {
+      "eventId": "",
+      "caseId": "invalid-case",
+      "timestamp": "yesterday",
+      "activity": { "id": "unknown-activity", "label": "Invalid activity", "type": "unsupported-type" },
+      "actor": {
+        "id": "invalid-actor",
+        "label": "Invalid actor",
+        "type": "robot",
+        "authorityLevel": 99
+      },
+      "result": { "status": "maybe" },
+      "resources": [
+        {
+          "kind": "electricity",
+          "value": 2.5,
+          "unit": "kWh",
+          "measurementClass": "unknown",
+          "sourceRef": ""
+        },
+        {
+          "kind": "water",
+          "value": 4,
+          "unit": "L",
+          "measurementClass": "estimated",
+          "sourceRef": "fixture://invalid/missing-allocation-method"
+        }
+      ],
+      "truthState": "certain",
+      "provenance": {
+        "sourceType": "spreadsheet",
+        "sourceRef": "",
+        "ingestedAt": "later"
+      },
+      "unexpectedField": true
+    }
+  ]
+}

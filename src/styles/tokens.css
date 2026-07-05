@@ -1,0 +1,24 @@
+:root {
+  --bg: #0a1628;
+  --bg-mid: #0d1e35;
+  --surface: #112240;
+  --surface-2: #162c4a;
+  --border: #1e3a5f;
+  --border-light: #2a4d73;
+  --text: #e8f0fc;
+  --text-muted: #7a9cc0;
+  --text-dim: #4a6a8a;
+  --accent: #f5c842;
+  --accent-hover: #ffd55a;
+  --accent-dim: rgba(245, 200, 66, 0.12);
+  --success: #2dd4a0;
+  --warning: #f59342;
+  --danger: #ef5260;
+  --info: #4f8ee8;
+  --nav-width: 220px;
+  --header-h: 56px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', monospace;
+}
