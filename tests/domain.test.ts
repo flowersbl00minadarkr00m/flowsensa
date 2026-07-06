@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { answerQuestion } from "../src/domain/analyst";
+import { omitNullObjectProperties } from "../src/domain/adapters";
 import { discoverProcess } from "../src/domain/discovery";
 import {
   createJsonExport,
@@ -26,6 +27,17 @@ const validCollection = sampleFixture as WorkEventCollection;
 const validRegistry = primitiveFixture as PrimitiveRegistry;
 
 describe("schema boundaries", () => {
+  it("normalizes null optional fields from SQL-backed telemetry exports", () => {
+    const withNulls = structuredClone(sampleFixture) as unknown as {
+      events: Array<Record<string, unknown>>;
+    };
+    withNulls.events[0]!.parentEventId = null;
+    withNulls.events[0]!.decision = null;
+    const normalized = omitNullObjectProperties(withNulls);
+    const result = validateWorkEvents(normalized);
+    expect(result.valid).toBe(true);
+  });
+
   it("accepts every supplied work event and primitive", () => {
     const eventResult = validateWorkEvents(sampleFixture);
     const registryResult = validatePrimitiveRegistry(primitiveFixture);
@@ -188,8 +200,8 @@ describe("closed-loop recommendations", () => {
 
   it("recommends bounded-loop for validate activity with objective evaluator", () => {
     const events = [
-      baseEvent({ eventId: "ev-1", result: { status: "success" } }),
-      baseEvent({ eventId: "ev-2", result: { status: "success" } }),
+      baseEvent({ eventId: "ev-1", result: { status: "success" }, acceptedOutcome: true }),
+      baseEvent({ eventId: "ev-2", result: { status: "success" }, acceptedOutcome: true }),
       baseEvent({ eventId: "ev-3", decision: { id: "d1", selectedPath: "Approved", ruleRef: "invoice-total-rule", rationale: "Within threshold" } }),
     ];
     const node = makeNode({});
@@ -207,13 +219,12 @@ describe("closed-loop recommendations", () => {
   });
 
   it("recommends one-shot when no objective evaluator exists", () => {
-    // Events with no success/failure results and no decision ruleRef — no machine-checkable objective
+    // Completion status alone is not a machine-checkable quality objective.
     const events = [
       baseEvent({ eventId: "ev-1", result: { status: "success" }, activity: { id: "review-draft", label: "Review draft", type: "review", primitiveVersion: "1.0.0" } }),
       baseEvent({ eventId: "ev-2", result: { status: "success" }, activity: { id: "review-draft", label: "Review draft", type: "review", primitiveVersion: "1.0.0" } }),
     ];
-    // Execute is high-risk (not reversible) — should block bounded-loop
-    const node = makeNode({ activityType: "execute" });
+    const node = makeNode({ activityType: "review" });
     const recs = recommendTreatments([node], events);
     expect(recs).toHaveLength(1);
     expect(recs[0].executionPattern).toBe("one-shot");

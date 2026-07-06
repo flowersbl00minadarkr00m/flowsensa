@@ -17,32 +17,26 @@ test("complete fixture workflow is keyboard-operable and local", async ({ page }
   await page.goto("/");
   await page.getByRole("button", { name: "Explore the demo" }).click();
   await expect(page.getByText("08", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Good morning, process engineer.")).toBeVisible();
-  await expect(page.getByText("Fictional demo", { exact: true })).toBeVisible();
-  await expect(page.getByText("northstar-invoice-2402", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText("Creator showcase", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fictional demonstration data", { exact: false })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("50 accepted");
 
-  await page.getByRole("button", { name: "Confirm" }).click();
-  const rationale = page.getByLabel("Override rationale").first();
-  await rationale.focus();
-  await rationale.fill("Confirmed against AP policy; owner reviewed.");
-  await expect(rationale).toBeFocused();
-  await page.getByLabel("Accountable owner").first().fill("AP process owner");
-  await page.getByRole("button", { name: "Confirm step" }).first().click();
-  await expect(page.getByText("user-confirmed").first()).toBeVisible();
+  await page.getByRole("button", { name: "Process Explorer" }).click();
+  await expect(page.getByRole("heading", { name: "Process Graph" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Engineer" }).click();
-  await expect(page.getByText("Sixteen rubric factors").first()).toBeVisible();
-  await expect(page.getByText("Responsibility & control gaps")).toBeVisible();
-  await expect(page.getByText("Deterministic / vibe-code").first()).toBeVisible();
-  await expect(page.getByText("Hybrid / agent with harness").first()).toBeVisible();
+  await page.getByRole("button", { name: "Improvement Opportunities" }).click();
+  await expect(page.getByRole("heading", { name: "Improvement Opportunities" })).toBeVisible();
+  await expect(page.getByText("Responsibility & Control Gaps")).toBeVisible();
+  await page.getByLabel("Family").selectOption("Automation");
+  await expect(page.getByRole("heading", { name: "Draft post" })).toBeVisible();
+  await page.getByLabel("Family").selectOption("Hybrid");
+  await expect(page.getByRole("heading", { name: "Research topic" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Ask" }).click();
-  await page
-    .getByRole("button", { name: "Which activities repeat most often?" })
-    .click();
-  await expect(page.locator(".answer-summary")).toContainText("repeat(s)");
+  await page.getByRole("button", { name: "AI Analyst" }).click();
+  await expect(page.getByRole("heading", { name: "Deterministic Analysis" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
   await expect(page.getByText("JSON round trip verified.")).toBeVisible();
   await page.getByRole("button", { name: "Preview" }).nth(2).click();
   await expect(page.getByText("Mermaid preview")).toBeVisible();

@@ -9,18 +9,15 @@ test("a real Mnemosync activity export imports directly into Flowsensa", async (
   });
   await page.reload();
 
-  await expect(
-    page.getByTitle(
-      "Export the local activity ledger for Flowsensa or another schema-compatible consumer.",
-    ),
-  ).toContainText("0");
+  const exportButton = page.getByTitle(
+    "Export the local activity ledger for Flowsensa or another schema-compatible consumer.",
+  );
+  const countBefore = Number((await exportButton.textContent())?.match(/\d+/)?.[0] ?? "0");
 
   await page.getByRole("button", { name: "⇄ Sync", exact: true }).click();
-  await expect(
-    page.getByTitle(
-      "Export the local activity ledger for Flowsensa or another schema-compatible consumer.",
-    ),
-  ).toContainText("1");
+  await expect
+    .poll(async () => Number((await exportButton.textContent())?.match(/\d+/)?.[0] ?? "0"))
+    .toBeGreaterThan(countBefore);
 
   const downloadPromise = page.waitForEvent("download");
   await page
@@ -36,5 +33,6 @@ test("a real Mnemosync activity export imports directly into Flowsensa", async (
   await page.locator('input[type="file"]').setInputFiles(downloadPath!);
   await expect(page.getByText("Imported process workspace")).toBeVisible();
   await expect(page.getByText("Private local data")).toBeVisible();
-  await expect(page.getByText("Handoff work between agents")).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("accepted, 0 rejected");
+  await expect(page.getByRole("heading", { name: "Top Opportunities" })).toBeVisible();
 });

@@ -11,11 +11,61 @@ export class JsonFileTelemetryAdapter implements TelemetryAdapter {
   readonly label = "JSON file";
 
   async import(input: unknown): Promise<unknown> {
-    if (typeof input === "string") {
-      return JSON.parse(input) as unknown;
-    }
-    return input;
+    const parsed = typeof input === "string"
+      ? JSON.parse(input) as unknown
+      : input;
+    return omitNullObjectProperties(parsed);
   }
+}
+
+/**
+ * SQL-backed JSON exports commonly serialize absent optional fields as null.
+ * The work-event schema represents absence by omitting those properties.
+ * Keep null array items so malformed collections still fail validation.
+ */
+export function omitNullObjectProperties(value: unknown): unknown {
+  const optionalNullableKeys = new Set([
+    "traceId",
+    "parentEventId",
+    "sequence",
+    "durationMs",
+    "intent",
+    "transition",
+    "system",
+    "objects",
+    "decision",
+    "evidence",
+    "resources",
+    "acceptedOutcome",
+    "confidence",
+    "tags",
+    "primitiveVersion",
+    "role",
+    "authorityLevel",
+    "version",
+    "tool",
+    "model",
+    "reasonCode",
+    "message",
+    "retryCount",
+    "transformation",
+    "contentHash",
+    "classification",
+    "sourceRef",
+    "allocationMethod",
+    "notes",
+  ]);
+  if (Array.isArray(value)) {
+    return value.map((item) => omitNullObjectProperties(item));
+  }
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key, item]) => item !== null || !optionalNullableKeys.has(key))
+      .map(([key, item]) => [key, omitNullObjectProperties(item)]),
+  );
 }
 
 export interface OpenTelemetryWorkEvent {

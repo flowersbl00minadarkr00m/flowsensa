@@ -168,7 +168,9 @@ function executionPatternFor(
   }
   const nodeEvents = events.filter((e) => node.eventIds.includes(e.eventId));
   const hasObjectiveMeasure = nodeEvents.some(
-    (e) => e.result.status === "success" || e.result.status === "failure" || e.decision?.ruleRef,
+    (event) =>
+      typeof event.acceptedOutcome === "boolean" ||
+      Boolean(event.decision?.ruleRef),
   );
   const hasQuickFeedback = (node.totalDurationMs / Math.max(node.frequency, 1)) < 300_000; // <5 min avg
   const isLowRisk = node.activityType !== "execute" && node.activityType !== "decide";
@@ -210,7 +212,7 @@ function loopConfigFor(
     expectedIterations,
     maxIterations,
     model: "openai/gpt-5.5",
-    estimatedAt: new Date().toISOString(),
+    estimatedAt: "2026-07-05T00:00:00.000Z",
   };
 
   const evaluator = isProbabilistic
