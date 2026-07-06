@@ -61,14 +61,28 @@ test("invalid fixture shows event and field errors without replacing valid data"
   await expect(page.getByRole("alert")).toContainText("events[0]");
 });
 
-test("narrow viewport retains the full primary navigation", async ({ page }) => {
+test("narrow viewport uses bottom tabs, drawer, and More sheet without overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await page.getByRole("button", { name: "Explore the demo" }).click();
-  for (const name of ["Observe", "Confirm", "Engineer", "Ask", "Meanings", "Export"]) {
-    await expect(page.getByRole("button", { name })).toBeVisible();
+
+  for (const name of ["Overview", "Explorer", "Activity", "Improve", "Sources", "More"]) {
+    await expect(page.getByRole("button", { name: new RegExp(name) })).toBeVisible();
   }
-  await expect(page.getByRole("button", { name: "Resources" })).toHaveCount(0);
+
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await expect(page.getByRole("dialog", { name: "Navigation" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Operational Overview" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Navigation" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: /More/ }).click();
+  await expect(page.getByRole("dialog", { name: "More modules" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Process Variants" })).toBeVisible();
 });
 
 test("an imported valid file replaces the showcase locally", async ({ page }) => {

@@ -1,6 +1,9 @@
 import type {
   AutomationFamily,
+  CostEstimate,
+  ExecutionPattern,
   GraphNode,
+  LoopConfig,
   Recommendation,
   RecommendationClass,
   RubricFactor,
@@ -153,6 +156,102 @@ function factorsFor(node: GraphNode, events: WorkEvent[]): RubricFactor[] {
   });
 }
 
+// ── Execution pattern selection ──────────────────────────────────────────────
+
+function executionPatternFor(
+  node: GraphNode,
+  recommendationClass: RecommendationClass,
+  events: WorkEvent[],
+): ExecutionPattern {
+  if (recommendationClass === "Keep manual" || recommendationClass === "Insufficient evidence") {
+    return "one-shot";
+  }
+  const nodeEvents = events.filter((e) => node.eventIds.includes(e.eventId));
+  const hasObjectiveMeasure = nodeEvents.some(
+    (e) => e.result.status === "success" || e.result.status === "failure" || e.decision?.ruleRef,
+  );
+  const hasQuickFeedback = (node.totalDurationMs / Math.max(node.frequency, 1)) < 300_000; // <5 min avg
+  const isLowRisk = node.activityType !== "execute" && node.activityType !== "decide";
+  const isReversible = node.activityType !== "execute";
+  const hasExceptions = node.exceptions > 0 || node.repeats > 0;
+
+  if (!hasObjectiveMeasure) return "one-shot";
+  if (hasExceptions) return "one-shot"; // simplify first
+  if (isLowRisk && isReversible && hasQuickFeedback && hasObjectiveMeasure) {
+    return "bounded-loop";
+  }
+  return "one-shot";
+}
+
+function loopConfigFor(
+  node: GraphNode,
+  recommendationClass: RecommendationClass,
+  events: WorkEvent[],
+): LoopConfig | undefined {
+  const pattern = executionPatternFor(node, recommendationClass, events);
+  if (pattern !== "bounded-loop") return undefined;
+
+  const isProbabilistic = recommendationClass.includes("Probabilistic") || recommendationClass.includes("Hybrid");
+
+  // Cost model: assume gpt-5.5 pricing as default
+  const inputPricePerM = 2.50;
+  const outputPricePerM = 10.00;
+  const inputTokensPerIteration = isProbabilistic ? 2000 : 200;
+  const outputTokensPerIteration = isProbabilistic ? 800 : 100;
+  const expectedIterations = isProbabilistic ? 3 : 5;
+  const maxIterations = isProbabilistic ? 8 : 15;
+
+  const cost: CostEstimate = {
+    inputPricePerM,
+    outputPricePerM,
+    inputTokensPerIteration,
+    outputTokensPerIteration,
+    toolCostPerIteration: 0,
+    expectedIterations,
+    maxIterations,
+    model: "openai/gpt-5.5",
+    estimatedAt: new Date().toISOString(),
+  };
+
+  const evaluator = isProbabilistic
+    ? "Deterministic output validator (schema + business rule check)"
+    : "Deterministic test suite or assertion check";
+
+  return {
+    evaluator,
+    evaluatorThreshold: "All assertions must pass; no regressions accepted",
+    stopConditions: [
+      "All validation checks pass",
+      `Maximum of ${maxIterations} iterations reached`,
+      "No improvement between consecutive iterations",
+    ],
+    escalationConditions: [
+      "Two consecutive failures with same error signature",
+      "Output violates a compliance or security boundary",
+      "Estimated remaining cost exceeds budget",
+    ],
+    failureAction: "Escalate to human with last output, full trace, and diagnostic summary",
+    reversibleIterations: node.activityType !== "execute",
+    modelSelfJudges: false,
+    cost,
+  };
+}
+
+function formatCostSummary(cost: CostEstimate): string {
+  const iterationCost =
+    (cost.inputTokensPerIteration / 1_000_000) * cost.inputPricePerM +
+    (cost.outputTokensPerIteration / 1_000_000) * cost.outputPricePerM +
+    cost.toolCostPerIteration;
+  const expectedRun = iterationCost * cost.expectedIterations;
+  const worstCase = iterationCost * cost.maxIterations;
+  return [
+    `~$${iterationCost.toFixed(4)}/iteration`,
+    `~$${expectedRun.toFixed(2)} expected total`,
+    `≤$${worstCase.toFixed(2)} worst-case (${cost.maxIterations} iter cap)`,
+    `Model: ${cost.model} @ $${cost.inputPricePerM}/$${cost.outputPricePerM} per 1M tokens`,
+  ].join(" · ");
+}
+
 export function recommendTreatments(
   nodes: GraphNode[],
   events: WorkEvent[],
@@ -161,20 +260,31 @@ export function recommendTreatments(
     .filter((node) => node.status !== "rejected")
     .map((node) => {
       const recommendationClass = treatmentFor(node);
+      const executionPattern = executionPatternFor(node, recommendationClass, events);
+      const loopConfig = loopConfigFor(node, recommendationClass, events);
+      const isProbabilistic =
+        recommendationClass.includes("Probabilistic") ||
+        recommendationClass.includes("Hybrid");
+
+      const costNote = loopConfig?.cost
+        ? ` · ${formatCostSummary(loopConfig.cost)}`
+        : "";
+
       return {
         nodeId: node.id,
         recommendationClass,
         automationFamily: automationFamilyFor(recommendationClass),
+        executionPattern,
+        ...(loopConfig ? { loopConfig } : {}),
         confidence: node.frequency >= 2 ? 0.78 : 0.62,
         uncertainty:
-          "Based on the supplied fixture only; policy intent, review capacity, and production exception diversity require confirmation.",
+          `Based on the supplied fixture only; policy intent, review capacity, and production exception diversity require confirmation.` +
+          costNote,
         evidenceEventIds: node.eventIds,
         factors: factorsFor(node, events),
-        expectedFailureModes:
-          recommendationClass.includes("Probabilistic") ||
-          recommendationClass.includes("Hybrid")
-            ? ["Incorrect semantic interpretation", "Unsupported confidence", "Context drift"]
-            : ["Rule drift", "Missing input", "Downstream integration failure"],
+        expectedFailureModes: isProbabilistic
+          ? ["Incorrect semantic interpretation", "Unsupported confidence", "Context drift"]
+          : ["Rule drift", "Missing input", "Downstream integration failure"],
         requiredControls: [
           "Schema validation",
           "Evidence retention",

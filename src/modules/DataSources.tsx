@@ -40,7 +40,7 @@ export function DataSources({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <span className="badge demo-badge">DEMO</span>
-              <h3 style={{ margin: 0 }}>Northstar Showcase (Demo)</h3>
+              <h3 style={{ margin: 0 }}>Creator Showcase (Demo)</h3>
             </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: 0 }}>
               Fictional 4-step LinkedIn → code → review → publish workflow. No real data.

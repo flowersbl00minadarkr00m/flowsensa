@@ -34,6 +34,50 @@ export type AutomationFamily =
   | "Hybrid / agent with harness"
   | "Insufficient evidence";
 
+export type ExecutionPattern =
+  | "one-shot"
+  | "bounded-loop"
+  | "continuous-monitoring";
+
+export interface CostEstimate {
+  /** Price per 1M input tokens in USD. */
+  inputPricePerM: number;
+  /** Price per 1M output tokens in USD. */
+  outputPricePerM: number;
+  /** Estimated input tokens per iteration. */
+  inputTokensPerIteration: number;
+  /** Estimated output tokens per iteration. */
+  outputTokensPerIteration: number;
+  /** Additional tool/API cost per iteration. */
+  toolCostPerIteration: number;
+  /** Expected number of iterations (median). */
+  expectedIterations: number;
+  /** Absolute maximum iterations (hard cap). */
+  maxIterations: number;
+  /** Model identifier (e.g. 'openai/gpt-5.5'). */
+  model: string;
+  /** Pricing date. */
+  estimatedAt: string;
+}
+
+export interface LoopConfig {
+  /** Machine-checkable objective threshold for loop evaluation. */
+  evaluator: string;
+  evaluatorThreshold: string;
+  /** Conditions that stop the loop early. */
+  stopConditions: string[];
+  /** Conditions that trigger human escalation. */
+  escalationConditions: string[];
+  /** What happens when the loop cannot meet the objective. */
+  failureAction: string;
+  /** Whether loop iterations are reversible. */
+  reversibleIterations: boolean;
+  /** Whether the model judges its own output (strongly discouraged). */
+  modelSelfJudges: boolean;
+  /** Cost estimate for this execution pattern. */
+  cost: CostEstimate;
+}
+
 export interface Activity {
   id: string;
   label: string;
@@ -247,6 +291,8 @@ export interface Recommendation {
   nodeId: string;
   recommendationClass: RecommendationClass;
   automationFamily: AutomationFamily;
+  executionPattern: ExecutionPattern;
+  loopConfig?: LoopConfig;
   confidence: number;
   uncertainty: string;
   evidenceEventIds: string[];

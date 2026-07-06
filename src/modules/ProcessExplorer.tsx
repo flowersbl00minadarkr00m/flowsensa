@@ -34,65 +34,25 @@ function SVGGraph({
   onSelectNode: (id: string) => void;
   selectedNodeId: string | null;
 }) {
-  const NODE_W = 144;
-  const NODE_H = 56;
-  const COL_GAP = 200;
-  const ROW_GAP = 80;
+  const NODE_W = 160;
+  const NODE_H = 64;
+  const COL_GAP = NODE_W + 60;
+  const ROW_GAP = NODE_H + 40;
 
-  // Simple topological sort
-  const inDegree = new Map<string, number>();
-  const adj = new Map<string, string[]>();
-  for (const n of graph.nodes) {
-    inDegree.set(n.id, 0);
-    adj.set(n.id, []);
-  }
-  for (const e of graph.edges) {
-    if (inDegree.has(e.to)) inDegree.set(e.to, (inDegree.get(e.to) ?? 0) + 1);
-    adj.get(e.from)?.push(e.to);
-  }
-
-  const queue = graph.nodes.filter(n => (inDegree.get(n.id) ?? 0) === 0).map(n => n.id);
-  const levelMap = new Map<string, number>();
-  let processed = [...queue];
-  while (processed.length > 0) {
-    const next: string[] = [];
-    for (const id of processed) {
-      const neighbors = adj.get(id) ?? [];
-      for (const nb of neighbors) {
-        const curr = inDegree.get(nb) ?? 0;
-        inDegree.set(nb, curr - 1);
-        if ((inDegree.get(nb) ?? 0) <= 0 && !levelMap.has(nb)) {
-          const maxLevel = Math.max(...graph.edges.filter(e => e.to === nb).map(e => (levelMap.get(e.from) ?? 0) + 1), 0);
-          levelMap.set(nb, maxLevel);
-          next.push(nb);
-        }
-      }
-    }
-    processed = next;
-  }
-  // Any unplaced nodes at level 0
-  for (const n of graph.nodes) {
-    if (!levelMap.has(n.id)) levelMap.set(n.id, 0);
-  }
-
-  const cols = new Map<number, string[]>();
-  for (const [id, level] of levelMap) {
-    const arr = cols.get(level) ?? [];
-    arr.push(id);
-    cols.set(level, arr);
-  }
-
+  // Left-to-right grid layout: nodes ordered by appearance, wrap every 5
   const posMap = new Map<string, { x: number; y: number }>();
-  for (const [col, ids] of cols) {
-    ids.forEach((id, row) => {
-      posMap.set(id, { x: col * COL_GAP + 20, y: row * ROW_GAP + 20 });
-    });
-  }
+  const MAX_PER_ROW = 5;
+  const sorted = [...graph.nodes];
+  sorted.forEach((node, i) => {
+    const col = i % MAX_PER_ROW;
+    const row = Math.floor(i / MAX_PER_ROW);
+    posMap.set(node.id, { x: col * COL_GAP + 30, y: row * ROW_GAP + 20 });
+  });
 
-  const maxCol = cols.size > 0 ? Math.max(...cols.keys()) : 0;
-  const maxRow = cols.size > 0 ? Math.max(...[...cols.values()].map(a => a.length)) : 1;
-  const svgW = (maxCol + 1) * COL_GAP + NODE_W + 40;
-  const svgH = maxRow * ROW_GAP + NODE_H + 40;
+  const totalRows = Math.ceil(sorted.length / MAX_PER_ROW);
+  const colsUsed = Math.min(sorted.length, MAX_PER_ROW);
+  const svgW = colsUsed * COL_GAP + 60;
+  const svgH = totalRows * ROW_GAP + 40;
 
   return (
     <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '400px', minWidth: '800px' }}>

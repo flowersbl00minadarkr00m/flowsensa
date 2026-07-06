@@ -139,23 +139,27 @@ export function SettingsModule({
 
               <label style={{ display: 'grid', gap: '0.4rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                 Model
-                <select
+                <input
+                  type="text"
+                  list="model-options"
                   value={modelInput}
                   onChange={e => setModelInput(e.target.value)}
+                  placeholder="openai/gpt-5.5 or any OpenRouter model"
                   style={{
                     background: 'var(--surface)',
                     border: '1px solid var(--border)',
                     color: 'var(--text)',
                     borderRadius: 'var(--radius)',
                     padding: '0.6rem 0.75rem',
-                    fontFamily: 'var(--font-sans)',
+                    fontFamily: 'var(--font-mono)',
                     fontSize: '0.82rem',
                   }}
-                >
+                />
+                <datalist id="model-options">
                   {MODEL_OPTIONS.map(m => (
-                    <option key={m} value={m}>{m}</option>
+                    <option key={m} value={m} />
                   ))}
-                </select>
+                </datalist>
               </label>
 
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

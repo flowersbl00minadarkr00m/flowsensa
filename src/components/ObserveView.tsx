@@ -29,8 +29,7 @@ export function ObserveView({ graph, events, onOpenEvent }: ObserveViewProps) {
           <h2 id="observe-title">Good morning, process engineer.</h2>
         </div>
         <p>
-          Here is what the local evidence says about your accounts-payable
-          process today.
+          Here is what the local evidence says about your work today.
         </p>
       </div>
       <div className="overview-grid">

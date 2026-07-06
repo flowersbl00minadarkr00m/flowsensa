@@ -1,10 +1,45 @@
 import type {
   Activity,
   Actor,
-  ResourceMeasurement,
   WorkEvent,
   WorkEventCollection,
 } from "../domain/types";
+
+// ── Creator + project activity catalog ──────────────────────────────────────
+
+const ACTIVITIES = {
+  research:     { id: "research-topic",     label: "Research topic",          type: "extract" as const },
+  draft:        { id: "draft-post",         label: "Draft post",              type: "execute" as const },
+  review:       { id: "review-draft",       label: "Review draft",            type: "review" as const },
+  revise:       { id: "revise-draft",       label: "Revise draft",            type: "execute" as const },
+  qa:           { id: "qa-post",            label: "QA post",                 type: "validate" as const },
+  publish:      { id: "publish-post",       label: "Publish post",            type: "close" as const },
+  plan:         { id: "plan-feature",       label: "Plan feature",            type: "decide" as const },
+  spec:         { id: "write-spec",         label: "Write specification",     type: "execute" as const },
+  code:         { id: "implement-code",     label: "Implement code",          type: "execute" as const },
+  test:         { id: "run-tests",          label: "Run tests",               type: "validate" as const },
+  fix:          { id: "fix-issues",         label: "Fix issues",              type: "execute" as const },
+  codeReview:   { id: "code-review",        label: "Code review",             type: "review" as const },
+  deploy:       { id: "deploy-release",     label: "Deploy release",          type: "execute" as const },
+  verify:       { id: "verify-deploy",      label: "Verify deployment",       type: "validate" as const },
+} as const satisfies Record<string, Activity>;
+
+const ACTORS = {
+  henry:        { id: "henry",              label: "Henry",                  type: "human" as const,  role: "Creator",       authorityLevel: 7 },
+  pi:           { id: "agent-pi",           label: "Pi",                     type: "agent" as const,  role: "AI work agent", authorityLevel: 3 },
+  codex:        { id: "agent-codex",        label: "Codex",                  type: "agent" as const,  role: "AI work agent", authorityLevel: 3 },
+  claude:       { id: "agent-claude",       label: "Claude Cowork",          type: "agent" as const,  role: "AI work agent", authorityLevel: 3 },
+  vite:         { id: "vite-dev-server",    label: "Vite dev server",        type: "system" as const, role: "Build system",   authorityLevel: 1 },
+  git:          { id: "git-vcs",            label: "Git",                    type: "system" as const, role: "Version control", authorityLevel: 2 },
+  vercel:       { id: "vercel-platform",    label: "Vercel",                 type: "system" as const, role: "Deploy platform", authorityLevel: 3 },
+  tests:        { id: "test-runner",        label: "Test runner",            type: "system" as const, role: "CI verification", authorityLevel: 2 },
+  lint:         { id: "linter",             label: "Linter",                 type: "system" as const, role: "Code quality",   authorityLevel: 2 },
+  supabase:     { id: "supabase-db",        label: "Supabase",               type: "service-account" as const, role: "Database", authorityLevel: 4 },
+  linkedin:     { id: "linkedin-platform",  label: "LinkedIn",               type: "external" as const, role: "Content platform", authorityLevel: 3 },
+  substack:     { id: "substack-platform",  label: "Substack",               type: "external" as const, role: "Content platform", authorityLevel: 3 },
+} as const satisfies Record<string, Actor>;
+
+// ── Post creation lifecycle ─────────────────────────────────────────────────
 
 interface DemoStep {
   activityId: keyof typeof ACTIVITIES;
@@ -21,257 +56,113 @@ interface DemoStep {
 interface DemoCase {
   caseId: string;
   start: string;
+  intent: string;
   steps: DemoStep[];
+  tags: string[];
 }
 
-const ACTIVITIES = {
-  receive: { id: "receive-invoice", label: "Receive invoice", type: "intake" },
-  extract: { id: "extract-invoice", label: "Extract invoice fields", type: "extract" },
-  validate: {
-    id: "validate-invoice",
-    label: "Validate fields and totals",
-    type: "validate",
-  },
-  match: {
-    id: "match-purchase-order",
-    label: "Match purchase order",
-    type: "reconcile",
-  },
-  resolve: {
-    id: "resolve-exception",
-    label: "Resolve exception",
-    type: "review",
-  },
-  route: {
-    id: "route-for-approval",
-    label: "Route for approval",
-    type: "handoff",
-  },
-  approve: { id: "approve-invoice", label: "Approve invoice", type: "review" },
-  post: { id: "post-invoice", label: "Post approved invoice", type: "execute" },
-  schedule: {
-    id: "schedule-payment",
-    label: "Schedule supplier payment",
-    type: "close",
-  },
-} as const satisfies Record<string, Activity>;
-
-const ACTORS = {
-  mailbox: {
-    id: "ap-intake-mailbox",
-    label: "AP intake mailbox",
-    type: "system",
-    role: "Invoice intake",
-    authorityLevel: 1,
-  },
-  extractor: {
-    id: "invoice-extraction-agent",
-    label: "Invoice extraction agent",
-    type: "agent",
-    role: "Field extraction",
-    authorityLevel: 2,
-  },
-  rules: {
-    id: "ap-validation-rules",
-    label: "AP validation rules",
-    type: "system",
-    role: "Deterministic validation",
-    authorityLevel: 2,
-  },
-  matcher: {
-    id: "three-way-match-service",
-    label: "Three-way match service",
-    type: "service-account",
-    role: "Purchase-order matching",
-    authorityLevel: 3,
-  },
-  analyst: {
-    id: "ap-operations-team",
-    label: "AP operations team",
-    type: "human",
-    role: "Exception resolution",
-    authorityLevel: 4,
-  },
-  router: {
-    id: "approval-routing-service",
-    label: "Approval routing service",
-    type: "system",
-    role: "Queue routing",
-    authorityLevel: 2,
-  },
-  approver: {
-    id: "business-unit-approver",
-    label: "Business unit approver",
-    type: "human",
-    role: "Budget owner",
-    authorityLevel: 5,
-  },
-  controller: {
-    id: "finance-controller",
-    label: "Finance controller",
-    type: "human",
-    role: "High-value approval",
-    authorityLevel: 6,
-  },
-  erp: {
-    id: "erp-posting-service",
-    label: "ERP posting service",
-    type: "service-account",
-    role: "Ledger posting",
-    authorityLevel: 6,
-  },
-  payments: {
-    id: "payment-scheduling-service",
-    label: "Payment scheduling service",
-    type: "service-account",
-    role: "Payment execution preparation",
-    authorityLevel: 6,
-  },
-} as const satisfies Record<string, Actor>;
-
-const standardSteps: DemoStep[] = [
-  { activityId: "receive", actorId: "mailbox", fromState: "not-received", toState: "received", durationMs: 48_000, waitMinutes: 0 },
-  { activityId: "extract", actorId: "extractor", fromState: "received", toState: "extracted", durationMs: 38_000, waitMinutes: 2 },
-  { activityId: "validate", actorId: "rules", fromState: "extracted", toState: "validated", durationMs: 5_000, waitMinutes: 1 },
-  { activityId: "match", actorId: "matcher", fromState: "validated", toState: "matched", durationMs: 8_000, waitMinutes: 1 },
-  { activityId: "route", actorId: "router", fromState: "matched", toState: "awaiting-approval", durationMs: 3_000, waitMinutes: 1 },
-  { activityId: "approve", actorId: "approver", fromState: "awaiting-approval", toState: "approved", durationMs: 150_000, waitMinutes: 96 },
-  { activityId: "post", actorId: "erp", fromState: "approved", toState: "posted", durationMs: 12_000, waitMinutes: 3 },
-  { activityId: "schedule", actorId: "payments", fromState: "posted", toState: "payment-scheduled", durationMs: 9_000, waitMinutes: 2, acceptedOutcome: true },
+const postCreationStandard: DemoStep[] = [
+  { activityId: "research", actorId: "pi",       fromState: "idea",          toState: "researched",       durationMs: 120_000, waitMinutes: 0 },
+  { activityId: "draft",    actorId: "codex",    fromState: "researched",    toState: "drafted",          durationMs: 300_000, waitMinutes: 5 },
+  { activityId: "review",   actorId: "henry",    fromState: "drafted",       toState: "reviewed",         durationMs: 480_000, waitMinutes: 45 },
+  { activityId: "revise",   actorId: "codex",    fromState: "reviewed",      toState: "revised",          durationMs: 180_000, waitMinutes: 2 },
+  { activityId: "qa",       actorId: "pi",       fromState: "revised",       toState: "qa-passed",        durationMs: 90_000,  waitMinutes: 1 },
+  { activityId: "publish",  actorId: "henry",    fromState: "qa-passed",     toState: "published",        durationMs: 60_000,  waitMinutes: 120, acceptedOutcome: true },
 ];
+
+const projectDeliveryStandard: DemoStep[] = [
+  { activityId: "plan",       actorId: "henry",    fromState: "idea",          toState: "planned",          durationMs: 600_000, waitMinutes: 0 },
+  { activityId: "spec",       actorId: "pi",       fromState: "planned",       toState: "specified",        durationMs: 240_000, waitMinutes: 10 },
+  { activityId: "code",       actorId: "codex",    fromState: "specified",     toState: "implemented",      durationMs: 900_000, waitMinutes: 5 },
+  { activityId: "test",       actorId: "tests",    fromState: "implemented",   toState: "tested",           durationMs: 45_000,  waitMinutes: 1 },
+  { activityId: "fix",        actorId: "codex",    fromState: "tested",        toState: "fixed",            durationMs: 120_000, waitMinutes: 1 },
+  { activityId: "test",       actorId: "tests",    fromState: "fixed",         toState: "re-tested",        durationMs: 45_000,  waitMinutes: 1 },
+  { activityId: "codeReview", actorId: "claude",   fromState: "re-tested",     toState: "reviewed",         durationMs: 180_000, waitMinutes: 15 },
+  { activityId: "fix",        actorId: "codex",    fromState: "reviewed",      toState: "review-fixes",     durationMs: 60_000,  waitMinutes: 1 },
+  { activityId: "deploy",     actorId: "vercel",   fromState: "review-fixes",  toState: "deployed",         durationMs: 90_000,  waitMinutes: 3 },
+  { activityId: "verify",     actorId: "pi",       fromState: "deployed",      toState: "verified",         durationMs: 30_000,  waitMinutes: 2, acceptedOutcome: true },
+];
+
+// ── Cases: mixed post creation + project delivery ───────────────────────────
 
 const cases: DemoCase[] = [
+  // Post 1: clean flow
   {
-    caseId: "northstar-invoice-2401",
-    start: "2026-06-16T15:00:00Z",
-    steps: standardSteps,
+    caseId: "post-2401",
+    start: "2026-06-16T09:00:00Z",
+    intent: "Publish LinkedIn post about AI sovereignty and portability",
+    steps: postCreationStandard,
+    tags: ["post-creation", "linkedin"],
   },
+  // Post 2: with revision loop
   {
-    caseId: "northstar-invoice-2402",
-    start: "2026-06-17T16:20:00Z",
+    caseId: "post-2402",
+    start: "2026-06-18T14:00:00Z",
+    intent: "Publish Substack deep-dive on agentic AI governance",
     steps: [
-      ...standardSteps.slice(0, 2),
-      { activityId: "validate", actorId: "rules", fromState: "extracted", toState: "validation-exception", durationMs: 5_000, waitMinutes: 1, status: "exception", reasonCode: "TOTAL_MISMATCH" },
-      { activityId: "resolve", actorId: "analyst", fromState: "validation-exception", toState: "corrected", durationMs: 390_000, waitMinutes: 1_120 },
-      { activityId: "validate", actorId: "rules", fromState: "corrected", toState: "validated", durationMs: 5_000, waitMinutes: 2, status: "retry", reasonCode: "REVALIDATED" },
-      ...standardSteps.slice(3),
+      ...postCreationStandard.slice(0, 3),
+      { activityId: "revise", actorId: "codex", fromState: "reviewed", toState: "revised", durationMs: 180_000, waitMinutes: 2 },
+      { activityId: "review", actorId: "henry", fromState: "revised",  toState: "re-reviewed",       durationMs: 240_000, waitMinutes: 60 },
+      { activityId: "revise", actorId: "codex", fromState: "re-reviewed", toState: "final-revised", durationMs: 120_000, waitMinutes: 1 },
+      ...postCreationStandard.slice(4),
     ],
+    tags: ["post-creation", "substack", "revision-loop"],
   },
+  // Post 3: QA caught issues
   {
-    caseId: "northstar-invoice-2403",
-    start: "2026-06-18T14:05:00Z",
+    caseId: "post-2403",
+    start: "2026-06-20T10:30:00Z",
+    intent: "Publish LinkedIn post about Codex threading patterns",
     steps: [
-      standardSteps[0]!,
-      { ...standardSteps[1]!, status: "failure", reasonCode: "LOW_EXTRACTION_CONFIDENCE" },
-      { ...standardSteps[1]!, fromState: "extraction-review", waitMinutes: 18, status: "retry", reasonCode: "HUMAN_ASSISTED_RETRY" },
-      ...standardSteps.slice(2),
+      ...postCreationStandard.slice(0, 4),
+      { activityId: "qa",     actorId: "pi",    fromState: "revised", toState: "qa-failed", durationMs: 90_000, waitMinutes: 1, status: "failure", reasonCode: "BROKEN_LINK" },
+      { activityId: "revise", actorId: "codex", fromState: "qa-failed", toState: "revised", durationMs: 60_000, waitMinutes: 1, status: "retry" },
+      { activityId: "qa",     actorId: "pi",    fromState: "revised", toState: "qa-passed", durationMs: 45_000, waitMinutes: 1, status: "retry", reasonCode: "FIX_VERIFIED" },
+      ...postCreationStandard.slice(5),
     ],
+    tags: ["post-creation", "linkedin", "qa-caught-issue"],
   },
+  // Project 1: SDD init for Slate
   {
-    caseId: "northstar-invoice-2404",
-    start: "2026-06-19T17:45:00Z",
+    caseId: "proj-2401",
+    start: "2026-07-01T08:00:00Z",
+    intent: "Initialize SDD steering for Slate project",
+    steps: projectDeliveryStandard,
+    tags: ["project-delivery", "sdd", "slate"],
+  },
+  // Project 2: Flowsensa closed-loop feature
+  {
+    caseId: "proj-2402",
+    start: "2026-07-04T14:00:00Z",
+    intent: "Implement closed-loop recommendations and SDD gate progression for Flowsensa",
     steps: [
-      ...standardSteps.slice(0, 6),
-      { activityId: "approve", actorId: "controller", fromState: "approved-by-owner", toState: "approved", durationMs: 210_000, waitMinutes: 185 },
-      ...standardSteps.slice(6),
+      ...projectDeliveryStandard.slice(0, 3),
+      { activityId: "test",  actorId: "tests",  fromState: "implemented", toState: "test-failed",     durationMs: 45_000, waitMinutes: 1, status: "failure", reasonCode: "TEST_ASSERTION_FAILED" },
+      { activityId: "fix",   actorId: "codex",  fromState: "test-failed", toState: "fixed",           durationMs: 300_000, waitMinutes: 3 },
+      { activityId: "test",  actorId: "tests",  fromState: "fixed",      toState: "re-tested",        durationMs: 45_000, waitMinutes: 1, status: "retry", reasonCode: "ALL_TESTS_PASS" },
+      ...projectDeliveryStandard.slice(5),
     ],
+    tags: ["project-delivery", "flowsensa", "closed-loop"],
   },
+  // Project 3: OSSensa GitHub discovery
   {
-    caseId: "northstar-invoice-2405",
-    start: "2026-06-20T15:30:00Z",
+    caseId: "proj-2403",
+    start: "2026-07-05T10:00:00Z",
+    intent: "Implement real GitHub discovery and risk disclaimer for OSSensa",
     steps: [
-      ...standardSteps.slice(0, 3),
-      { activityId: "match", actorId: "matcher", fromState: "validated", toState: "match-exception", durationMs: 8_000, waitMinutes: 1, status: "exception", reasonCode: "PO_NOT_FOUND" },
-      { activityId: "resolve", actorId: "analyst", fromState: "match-exception", toState: "po-linked", durationMs: 540_000, waitMinutes: 840 },
-      { activityId: "match", actorId: "matcher", fromState: "po-linked", toState: "matched", durationMs: 8_000, waitMinutes: 2, status: "retry", reasonCode: "MATCH_RETRIED" },
-      ...standardSteps.slice(4),
+      { activityId: "plan",       actorId: "henry",    fromState: "idea",        toState: "planned",          durationMs: 300_000, waitMinutes: 0 },
+      { activityId: "spec",       actorId: "pi",       fromState: "planned",     toState: "specified",        durationMs: 180_000, waitMinutes: 5 },
+      { activityId: "code",       actorId: "codex",    fromState: "specified",   toState: "implemented",      durationMs: 600_000, waitMinutes: 2 },
+      { activityId: "codeReview", actorId: "claude",   fromState: "implemented", toState: "reviewed",         durationMs: 120_000, waitMinutes: 10 },
+      { activityId: "fix",        actorId: "codex",    fromState: "reviewed",    toState: "review-fixes",     durationMs: 60_000,  waitMinutes: 1 },
+      { activityId: "deploy",     actorId: "vercel",   fromState: "review-fixes", toState: "deployed",        durationMs: 90_000,  waitMinutes: 2 },
+      { activityId: "verify",     actorId: "pi",       fromState: "deployed",    toState: "verified",         durationMs: 30_000,  waitMinutes: 1, acceptedOutcome: true },
     ],
-  },
-  {
-    caseId: "northstar-invoice-2406",
-    start: "2026-06-23T13:15:00Z",
-    steps: standardSteps.map((step) => ({
-      ...step,
-      waitMinutes: step.activityId === "approve" ? 22 : step.waitMinutes,
-    })),
-  },
-  {
-    caseId: "northstar-invoice-2407",
-    start: "2026-06-24T18:10:00Z",
-    steps: standardSteps.map((step) => ({
-      ...step,
-      waitMinutes: step.activityId === "approve" ? 310 : step.waitMinutes,
-    })),
-  },
-  {
-    caseId: "northstar-invoice-2408",
-    start: "2026-06-25T14:40:00Z",
-    steps: [
-      ...standardSteps.slice(0, 2),
-      { activityId: "validate", actorId: "rules", fromState: "extracted", toState: "validation-exception", durationMs: 5_000, waitMinutes: 1, status: "exception", reasonCode: "DUPLICATE_INVOICE" },
-      { activityId: "resolve", actorId: "analyst", fromState: "validation-exception", toState: "cancelled-duplicate", durationMs: 180_000, waitMinutes: 35, status: "cancelled", reasonCode: "DUPLICATE_CONFIRMED" },
-    ],
+    tags: ["project-delivery", "ossensa", "github-discovery"],
   },
 ];
 
-function resourcesFor(
-  activityId: keyof typeof ACTIVITIES,
-  eventId: string,
-): ResourceMeasurement[] | undefined {
-  if (activityId === "extract") {
-    return [
-      { kind: "input-tokens", value: 1_180, unit: "token", measurementClass: "provider-reported", sourceRef: `demo://model-usage/${eventId}` },
-      { kind: "output-tokens", value: 176, unit: "token", measurementClass: "provider-reported", sourceRef: `demo://model-usage/${eventId}` },
-      { kind: "financial", value: 0.004, unit: "USD", measurementClass: "provider-reported", sourceRef: `demo://model-usage/${eventId}` },
-      {
-        kind: "electricity",
-        value: 0.0008,
-        unit: "kWh",
-        measurementClass: "estimated",
-        sourceRef: `demo://resource-estimate/${eventId}`,
-        allocationMethod: "Fictional scenario estimate for demonstrating measurement safeguards.",
-        confidence: 0.25,
-      },
-      {
-        kind: "water",
-        value: null,
-        unit: "L",
-        measurementClass: "unknown",
-        sourceRef: `demo://resource-unknown/${eventId}`,
-        notes: "Unknown by design; never presented as measured.",
-      },
-    ];
-  }
-  if (["resolve", "approve"].includes(activityId)) {
-    const minutes = activityId === "resolve" ? 7 : 3;
-    return [
-      { kind: "human-time", value: minutes, unit: "minute", measurementClass: "metered", sourceRef: `demo://timer/${eventId}` },
-      {
-        kind: "financial",
-        value: activityId === "resolve" ? 4.67 : 2.25,
-        unit: "USD",
-        measurementClass: "allocated",
-        sourceRef: `demo://labour-allocation/${eventId}`,
-        allocationMethod: `${minutes} fictional minutes at the scenario loaded hourly rate.`,
-        confidence: 0.8,
-      },
-    ];
-  }
-  if (["receive", "post", "schedule"].includes(activityId)) {
-    return [
-      {
-        kind: "financial",
-        value: activityId === "receive" ? 0.001 : 0.002,
-        unit: "USD",
-        measurementClass: "allocated",
-        sourceRef: `demo://system-allocation/${eventId}`,
-        allocationMethod: "Fictional system cost divided by scenario transaction volume.",
-        confidence: 0.55,
-      },
-    ];
-  }
-  return undefined;
-}
+// ── Build events ────────────────────────────────────────────────────────────
 
 function buildCase(demoCase: DemoCase): WorkEvent[] {
   let elapsedMinutes = 0;
@@ -284,17 +175,9 @@ function buildCase(demoCase: DemoCase): WorkEvent[] {
       ...ACTIVITIES[step.activityId],
       primitiveVersion: "1.0.0",
     };
-    const eventId = `${demoCase.caseId}-event-${String(index + 1).padStart(2, "0")}`;
+    const eventId = `${demoCase.caseId}-step-${String(index + 1).padStart(2, "0")}`;
     const status = step.status ?? "success";
-    const hasDecision = ["validate", "match", "approve"].includes(step.activityId);
-    const evidence = step.activityId === "receive"
-      ? undefined
-      : [{
-          id: `${eventId}-evidence`,
-          sourceRef: `demo://evidence/${eventId}`,
-          label: `Fictional ${activity.label.toLowerCase()} evidence`,
-          classification: "synthetic-demo",
-        }];
+    const hasDecision = ["plan", "spec", "review", "qa", "codeReview", "verify"].includes(step.activityId);
 
     elapsedMinutes += step.durationMs / 60_000;
     return {
@@ -302,57 +185,49 @@ function buildCase(demoCase: DemoCase): WorkEvent[] {
       caseId: demoCase.caseId,
       traceId: `trace-${demoCase.caseId}`,
       parentEventId: index > 0
-        ? `${demoCase.caseId}-event-${String(index).padStart(2, "0")}`
+        ? `${demoCase.caseId}-step-${String(index).padStart(2, "0")}`
         : undefined,
       timestamp,
       sequence: index + 1,
       durationMs: step.durationMs,
-      intent: "Pay a valid supplier invoice accurately, with evidence and accountable approval.",
+      intent: demoCase.intent,
       activity,
       transition: { fromState: step.fromState, toState: step.toState },
       actor: ACTORS[step.actorId],
-      system: step.actorId === "mailbox" || step.actorId === "rules" || step.actorId === "router"
-        ? { id: `${step.actorId}-system`, label: ACTORS[step.actorId].label, version: "showcase-1" }
+      system: ["vite", "git", "vercel", "tests", "lint", "supabase", "linkedin", "substack"].includes(step.actorId)
+        ? { id: `${step.actorId}-system`, label: ACTORS[step.actorId].label, version: "showcase-v2" }
         : undefined,
-      objects: [{
-        id: `invoice-${demoCase.caseId}`,
-        type: "supplier-invoice",
-        role: step.activityId === "receive" ? "subject" : "input",
-        classification: "synthetic-demo",
-      }],
       decision: hasDecision
         ? {
             id: `${eventId}-decision`,
-            selectedPath: status === "exception" || status === "failure" ? "exception" : "pass",
+            selectedPath: status === "exception" || status === "failure" ? "review" : "approved",
             rationale: step.reasonCode
-              ? `Scenario condition: ${step.reasonCode}.`
-              : `Fictional ${activity.label.toLowerCase()} rule passed.`,
-            ruleRef: `demo://policy/${step.activityId}-v1`,
+              ? `Review condition: ${step.reasonCode}.`
+              : `${activity.label} passed review.`,
+            ruleRef: `policy://${step.activityId}-v1`,
             decidingAuthority: ACTORS[step.actorId].id,
           }
         : undefined,
       result: {
-        status,
+        status: step.status ?? "success",
         reasonCode: step.reasonCode,
-        retryCount: status === "retry" ? 1 : undefined,
+        retryCount: step.status === "retry" ? 1 : undefined,
       },
-      evidence,
-      resources: resourcesFor(step.activityId, eventId),
       acceptedOutcome: step.acceptedOutcome ?? false,
       truthState: "observed",
       provenance: {
         sourceType: "file-import",
-        sourceRef: "demo://northstar-operations/ap-showcase-v1",
-        ingestedAt: "2026-07-04T05:00:00Z",
-        transformation: "Deterministic fictional showcase dataset; contains no real organization or supplier data.",
+        sourceRef: "demo://creator-showcase/post-project-v2",
+        ingestedAt: "2026-07-05T18:00:00Z",
+        transformation: "Synthetic creator/project showcase — no real organization data.",
       },
-      tags: ["showcase-demo", "synthetic", "accounts-payable"],
+      tags: ["showcase-demo", "synthetic", ...demoCase.tags],
     };
   });
 }
 
 export const showcaseWorkEvents: WorkEventCollection = {
   schemaVersion: "1.0.0",
-  exportedAt: "2026-07-04T05:00:00Z",
+  exportedAt: "2026-07-05T18:00:00Z",
   events: cases.flatMap(buildCase),
 };

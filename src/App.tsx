@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "./lib/supabase";
 import { EventDialog } from "./components/EventDialog";
 import { ImportPanel } from "./components/ImportPanel";
 import { calculateKPIs } from "./lib/kpiEngine";
@@ -87,6 +86,22 @@ const NAV_ITEMS: Array<{ id: View; label: string; number: string }> = [
   { id: "settings", label: "Settings", number: "10" },
 ] as const;
 
+const BOTTOM_TABS: View[] = ["overview", "explorer", "activity", "improvements", "sources"];
+const MORE_ITEMS: View[] = ["variants", "performance", "alerts", "analyst", "settings"];
+
+const TAB_LABELS: Record<View, string> = {
+  overview: "Overview",
+  explorer: "Explorer",
+  variants: "Variants",
+  activity: "Activity",
+  performance: "Perf",
+  improvements: "Improve",
+  alerts: "Alerts",
+  analyst: "Analyst",
+  sources: "Sources",
+  settings: "Settings",
+};
+
 const adapter = new JsonFileTelemetryAdapter();
 
 function cloneGraph(graph: ProcessGraph): ProcessGraph {
@@ -116,6 +131,9 @@ export function App() {
   const [openRouterConfig, setOpenRouterConfig] = useState<OpenRouterConfig | null>(null);
   const [demoCounter, setDemoCounter] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+  const moreSheetRef = useRef<HTMLDivElement>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [alertUpdates, setAlertUpdates] = useState<Map<string, Alert["status"]>>(new Map());
   const workspaceFileInputRef = useRef<HTMLInputElement>(null);
@@ -212,6 +230,25 @@ export function App() {
     setTimeout(() => setToastMsg(null), 3000);
   }
 
+  // Lock body scroll + focus trap helpers
+  function lockScroll() { document.body.style.overflow = "hidden"; }
+  function unlockScroll() { document.body.style.overflow = ""; }
+
+  function openMobileNav() { lockScroll(); setMobileNavOpen(true); }
+  function closeMobileNav() { unlockScroll(); setMobileNavOpen(false); }
+  function openMoreSheet() { lockScroll(); setMoreSheetOpen(true); }
+  function closeMoreSheet() { unlockScroll(); setMoreSheetOpen(false); }
+
+  function handleMobileNavKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") { closeMobileNav(); closeMoreSheet(); }
+  }
+
+  function selectView(v: View) {
+    setView(v);
+    closeMobileNav();
+    closeMoreSheet();
+  }
+
   // importPayload declared before handleRunDemo so we can reference it
   const importPayload = useCallback(async (payload: unknown, label: string) => {
     try {
@@ -267,63 +304,6 @@ export function App() {
     }
   }, []);
 
-  const handleLoadFromMnemosync = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('telemetry_events')
-        .select('*')
-        .order('timestamp', { ascending: true })
-        .limit(2000)
-
-      if (error) {
-        setIssues([{ eventId: 'supabase', field: '(query)', reason: error.message, keyword: 'supabase' }])
-        setImportSummary('MnemoSync: query failed. Is the telemetry_events table set up?')
-        return
-      }
-      if (!data || data.length === 0) {
-        setImportSummary('MnemoSync: no events found. Agents may not have written any telemetry yet.')
-        return
-      }
-
-      const events = data.map((row: Record<string, unknown>) => ({
-        eventId: row.event_id,
-        caseId: row.case_id,
-        traceId: row.trace_id,
-        parentEventId: row.parent_event_id,
-        timestamp: row.timestamp,
-        sequence: row.sequence ?? 0,
-        intent: row.intent,
-        activity: row.activity,
-        transition: row.transition,
-        actor: row.actor,
-        objects: row.objects,
-        decision: row.decision,
-        result: row.result ?? { status: 'success' },
-        evidence: row.evidence,
-        acceptedOutcome: row.accepted_outcome,
-        truthState: row.truth_state ?? 'observed',
-        provenance: row.provenance ?? {
-          sourceType: 'mnemosync',
-          sourceRef: `mnemosync://ticket/${row.case_id}`,
-          ingestedAt: row.timestamp,
-          transformation: 'Flowsensa Supabase import',
-        },
-        tags: row.tags ?? ['mnemosync'],
-      }))
-
-      const collection = {
-        schemaVersion: '1.0.0' as const,
-        exportedAt: new Date().toISOString(),
-        events,
-      }
-
-      await importPayload(collection, `MnemoSync (${events.length} events)`)
-    } catch (err) {
-      setIssues([{ eventId: 'supabase', field: '(fetch)', reason: err instanceof Error ? err.message : 'Unknown error', keyword: 'supabase' }])
-      setImportSummary('MnemoSync: failed to load events.')
-    }
-  }, [importPayload])
-
   const handleRunDemo = useCallback(() => {
     const event = emitDemoEvent(demoCounter);
     const collection: WorkEventCollection = {
@@ -359,6 +339,27 @@ export function App() {
     setDemoCounter(c => c + 1);
     showToast(`Demo event ingested: ${event.eventId}`);
   }, [demoCounter, events, importPayload]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!mobileNavOpen && !moreSheetOpen) {
+      document.body.style.overflow = "";
+      return;
+    }
+
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMobileNav();
+        closeMoreSheet();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [mobileNavOpen, moreSheetOpen]);
 
   const handleResetDemo = useCallback(() => {
     if (!events) return;
@@ -701,12 +702,11 @@ export function App() {
         <ImportPanel
           issues={issues}
           importSummary={importSummary}
-          onDemo={() => void importPayload(showcaseWorkEvents, "Northstar fictional showcase")}
+          onDemo={() => void importPayload(showcaseWorkEvents, "Creator showcase")}
           onInvalidDemo={() => void importPayload(invalidFixture, "Invalid fixture")}
           onFile={(file) => void file.text().then((text) => importPayload(text, file.name))}
-          onLoadFromMnemosync={handleLoadFromMnemosync}
         />
-        <footer>Mnemosync export → telemetry adapter → Flowsensa</footer>
+        <footer>Supabase telemetry → Flowsensa process intelligence</footer>
       </main>
     );
   }
@@ -715,47 +715,112 @@ export function App() {
 
   return (
     <div className="app-shell">
-      {/* Mobile nav overlay */}
+      {/* Mobile hamburger nav drawer */}
       {mobileNavOpen && (
-        <div
-          className="mobile-nav-overlay open"
-          onClick={() => setMobileNavOpen(false)}
-          aria-hidden="true"
-        >
-          <div className="mobile-nav-drawer" onClick={e => e.stopPropagation()}>
-            <button
-              className="mobile-nav-close"
-              type="button"
-              onClick={() => setMobileNavOpen(false)}
-              aria-label="Close navigation"
-            >
-              ✕
-            </button>
-            <div className="brand-header" style={{ padding: "0.5rem 1rem 1rem", display: "flex", alignItems: "center", gap: "0.65rem" }}>
-              <div className="brand-mark" style={{ width: "2rem", height: "2rem", display: "grid", placeItems: "center", background: "var(--accent)", color: "#0a1628", borderRadius: "var(--radius)", fontWeight: 700, fontFamily: "var(--font-mono)", fontSize: "0.9rem" }}>F</div>
-              <div className="brand-name">
-                <strong style={{ color: "var(--text)", fontSize: "0.9rem" }}>Flowsensa</strong>
-                <span style={{ color: "var(--text-dim)", fontSize: "0.65rem" }}>Process intelligence</span>
-              </div>
+        <>
+          <div
+            className="mobile-drawer-backdrop"
+            onClick={closeMobileNav}
+            aria-hidden="true"
+          />
+          <div
+            ref={mobileNavRef}
+            className="mobile-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation"
+            onKeyDown={handleMobileNavKeyDown}
+          >
+            <div className="mobile-drawer-header">
+              <div className="brand-mark" style={{ width: "1.8rem", height: "1.8rem", fontSize: "0.8rem" }}>F</div>
+              <strong>Flowsensa</strong>
+              <button className="mobile-drawer-close" onClick={closeMobileNav} aria-label="Close navigation" type="button">✕</button>
             </div>
-            <nav aria-label="Process modules" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.15rem", padding: "0.5rem" }}>
+            <nav className="mobile-drawer-nav" aria-label="Process modules">
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.id}
-                  className={view === item.id ? "active" : ""}
+                  className={`mobile-drawer-link${view === item.id ? " active" : ""}`}
                   type="button"
                   aria-current={view === item.id ? "page" : undefined}
-                  onClick={() => { setView(item.id); setMobileNavOpen(false); }}
-                  style={{ display: "flex", alignItems: "center", gap: "0.65rem", padding: "0.6rem 0.75rem", borderRadius: "var(--radius)", border: "none", background: view === item.id ? "var(--accent-dim)" : "transparent", color: view === item.id ? "var(--accent)" : "var(--text-muted)", fontSize: "0.82rem", cursor: "pointer" }}
+                  onClick={() => selectView(item.id)}
                 >
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.62rem", color: view === item.id ? "var(--accent)" : "var(--text-dim)", minWidth: "1.4rem" }}>{item.number}</span>
+                  <span className="mobile-drawer-num">{item.number}</span>
                   {item.label}
                 </button>
               ))}
             </nav>
+            <div className="mobile-drawer-footer">
+              <button className="btn" style={{ fontSize: "0.72rem", width: "100%" }} type="button" onClick={() => { closeMobileNav(); workspaceFileInputRef.current?.click(); }}>Import data</button>
+              <button className="btn danger ghost" style={{ fontSize: "0.72rem", width: "100%" }} type="button" onClick={() => { closeMobileNav(); void handleClear(); }}>Delete local data</button>
+            </div>
           </div>
-        </div>
+        </>
       )}
+
+      {/* More sheet (variants, performance, alerts, analyst, settings) */}
+      {moreSheetOpen && (
+        <>
+          <div className="mobile-drawer-backdrop" onClick={closeMoreSheet} aria-hidden="true" />
+          <div
+            ref={moreSheetRef}
+            className="mobile-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="More modules"
+            onKeyDown={handleMobileNavKeyDown}
+          >
+            <div className="mobile-sheet-handle" />
+            <div className="mobile-sheet-header">
+              <h3>More</h3>
+              <button className="mobile-drawer-close" onClick={closeMoreSheet} aria-label="Close" type="button">✕</button>
+            </div>
+            <nav className="mobile-drawer-nav" aria-label="Additional modules">
+              {MORE_ITEMS.map((id) => {
+                const item = NAV_ITEMS.find((n) => n.id === id)!;
+                return (
+                  <button
+                    key={item.id}
+                    className={`mobile-drawer-link${view === item.id ? " active" : ""}`}
+                    type="button"
+                    aria-current={view === item.id ? "page" : undefined}
+                    onClick={() => selectView(item.id)}
+                  >
+                    <span className="mobile-drawer-num">{item.number}</span>
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </>
+      )}
+
+      {/* Mobile bottom tab bar */}
+      <nav className="bottom-tabs" aria-label="Primary navigation">
+        {BOTTOM_TABS.map((id) => (
+          <button
+            key={id}
+            className={`bottom-tab${view === id ? " active" : ""}`}
+            type="button"
+            aria-current={view === id ? "page" : undefined}
+            onClick={() => selectView(id)}
+          >
+            <span className="bottom-tab-icon" aria-hidden="true">
+              {id === "overview" ? "◉" : id === "explorer" ? "◎" : id === "activity" ? "☰" : id === "improvements" ? "✦" : "◷"}
+            </span>
+            {TAB_LABELS[id]}
+          </button>
+        ))}
+        <button
+          className={`bottom-tab${moreSheetOpen ? " active" : ""}`}
+          type="button"
+          onClick={moreSheetOpen ? closeMoreSheet : openMoreSheet}
+        >
+          <span className="bottom-tab-icon" aria-hidden="true">⋯</span>
+          More
+        </button>
+      </nav>
 
       <aside className="sidebar">
         <div className="brand-header">
@@ -809,15 +874,15 @@ export function App() {
               className="hamburger"
               type="button"
               aria-label="Open navigation"
-              onClick={() => setMobileNavOpen(true)}
+              onClick={() => openMobileNav()}
             >
               ☰
             </button>
             <span className="status-pill">{isShowcase ? "DEMO" : "DATA"}</span>
             <div>
-              <strong>{isShowcase ? "Northstar AP showcase" : "Imported process workspace"}</strong>
+              <strong>{isShowcase ? "Creator showcase" : "Imported process workspace"}</strong>
               <span>
-                {isShowcase ? "Fictional presentation data" : "Private local data"} · schema v{events.schemaVersion}
+                {isShowcase ? "Fictional demonstration data" : "Private local data"} · schema v{events.schemaVersion}
               </span>
             </div>
           </div>
@@ -838,7 +903,7 @@ export function App() {
                 className="btn ghost"
                 style={{ fontSize: "0.72rem", padding: "0.3rem 0.6rem" }}
                 type="button"
-                onClick={() => void importPayload(showcaseWorkEvents, "Northstar fictional showcase")}
+                onClick={() => void importPayload(showcaseWorkEvents, "Creator showcase")}
               >
                 Load demo
               </button>
@@ -861,12 +926,11 @@ export function App() {
         />
 
         {isShowcase && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", background: "var(--accent-dim)", borderBottom: "1px solid rgba(245,200,66,0.2)", padding: "0.6rem 1.5rem", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-            <span className="badge demo-badge">DEMO</span>
-            <span>Northstar Operations is a made-up organization. No real data.</span>
+          <div className="showcase-banner">
+            <span className="demo-label">DEMO</span>
+            <p>Creator showcase: post creation and software-project delivery. No real data.</p>
             <button
               className="btn"
-              style={{ marginLeft: "auto", fontSize: "0.72rem", padding: "0.25rem 0.6rem" }}
               type="button"
               onClick={() => workspaceFileInputRef.current?.click()}
             >
@@ -876,14 +940,14 @@ export function App() {
         )}
 
         {issues.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "rgba(239,82,96,0.1)", borderBottom: "1px solid rgba(239,82,96,0.3)", padding: "0.6rem 1.5rem", fontSize: "0.78rem", color: "var(--danger)" }} role="alert">
+          <div className="workspace-import-error" role="alert">
             <strong>Import blocked</strong>
             <span>{issues.length} schema issue{issues.length === 1 ? "" : "s"}. Workspace preserved.</span>
             <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem" }}>{issues[0]?.eventId}: {issues[0]?.field} — {issues[0]?.reason}</code>
           </div>
         )}
         {!issues.length && importSummary && (
-          <div style={{ background: "rgba(45,212,160,0.08)", borderBottom: "1px solid rgba(45,212,160,0.2)", padding: "0.5rem 1.5rem", fontSize: "0.75rem", color: "var(--success)" }} role="status">
+          <div className="workspace-import-status" role="status">
             {importSummary}
           </div>
         )}

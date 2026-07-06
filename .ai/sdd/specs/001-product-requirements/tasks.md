@@ -427,6 +427,30 @@
 
 ---
 
+### T20 · Closed-loop recommendation execution pattern
+**Priority:** P1 | **Estimate:** 1h | **Dependencies:** T10
+
+**Work:**
+- [ ] Fix `loopConfigFor()` to receive real events instead of empty array
+- [ ] Verify `executionPatternFor()` selects `"bounded-loop"` when: objective evaluator exists, feedback is quick, activity is low-risk/reversible, no exceptions observed
+- [ ] Verify `loopConfigFor()` returns `LoopConfig` with evaluator, stop/escalation conditions, failure action, and `CostEstimate`
+- [ ] Verify cost formula: `iterationCost = (inputTokens/1M)*inputPrice + (outputTokens/1M)*outputPrice + toolCost`
+- [ ] Verify closed loop is NOT recommended when: no evaluator, exceptions observed, high-risk/irreversible, subjective quality without measure
+- [ ] Add unit test: bounded-loop produced for validate activity with success/failure results
+- [ ] Add unit test: one-shot produced for execute activity with exceptions
+- [ ] Verify recommendations display cost summary string in Improvement Opportunities view
+
+**Acceptance criteria:**
+- `loopConfigFor()` defect fixed — receives real `events` parameter
+- `recommendTreatments()` produces `executionPattern: "bounded-loop"` with `loopConfig` for eligible activities
+- No loop recommended for high-risk or exception-heavy activities
+- Cost estimates are deterministic for identical input
+
+**Files:** `src/domain/recommendations.ts`, `tests/recommendations.test.ts`
+**Verification:** `npm test`, `npm run lint`
+
+---
+
 ## Requirement Coverage
 
 | Requirement | Task IDs |
@@ -452,4 +476,5 @@
 | FR-022 | T15, T16 |
 | FR-023 | T06 |
 | FR-024 | T14 |
+| FR-026 | T20 |
 | NFR-009 | T17, T18 |

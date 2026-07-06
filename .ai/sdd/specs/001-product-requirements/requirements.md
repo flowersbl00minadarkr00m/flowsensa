@@ -317,6 +317,23 @@ THE SYSTEM SHALL load a clearly labeled synthetic workspace representing post
 creation and software-project delivery, and all demo actions shall extend that
 same process domain through the normal ingestion path.
 
+### FR-026: Bounded closed-loop recommendations — Should Have
+
+WHEN an activity has a machine-checkable objective evaluator, quick feedback,
+reversible or low-risk iterations, and a plausible improvement trajectory
+THE SYSTEM SHALL recommend a bounded closed-loop execution pattern with:
+- an explicit evaluator and objective threshold;
+- expected and maximum iterations;
+- stop, failure, rollback, and human-escalation conditions;
+- per-iteration token and tool cost estimates;
+- expected and worst-case total run cost;
+- model, pricing source, effective date, and volume assumptions.
+
+WHEN a machine-checkable evaluator is absent, the work is high-risk or
+irreversible, or exceptions have been observed
+THE SYSTEM SHALL NOT recommend an autonomous closed loop and shall instead
+recommend one-shot execution or human-led treatment.
+
 ## Non-Functional Requirements
 
 ### NFR-001: Privacy and security

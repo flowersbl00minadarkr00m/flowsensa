@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { ValidationIssue } from "../domain/validation";
 
 interface ImportPanelProps {
@@ -7,7 +7,6 @@ interface ImportPanelProps {
   onDemo: () => void;
   onInvalidDemo: () => void;
   onFile: (file: File) => void;
-  onLoadFromMnemosync?: () => Promise<void>;
 }
 
 export function ImportPanel({
@@ -16,10 +15,8 @@ export function ImportPanel({
   onDemo,
   onInvalidDemo,
   onFile,
-  onLoadFromMnemosync,
 }: ImportPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [loadingMnemosync, setLoadingMnemosync] = useState(false);
 
   return (
     <section className="import-panel" aria-labelledby="import-title">
@@ -39,18 +36,6 @@ export function ImportPanel({
           <button className="primary" type="button" onClick={onDemo}>
             Explore the demo <span aria-hidden="true">↗</span>
           </button>
-          {onLoadFromMnemosync && (
-            <button
-              type="button"
-              disabled={loadingMnemosync}
-              onClick={() => {
-                setLoadingMnemosync(true);
-                onLoadFromMnemosync().finally(() => setLoadingMnemosync(false));
-              }}
-            >
-              {loadingMnemosync ? 'Loading...' : 'Load from MnemoSync'}
-            </button>
-          )}
           <button type="button" onClick={() => inputRef.current?.click()}>
             Import JSON
           </button>
@@ -88,7 +73,7 @@ export function ImportPanel({
             <span />
             <span />
             <span />
-            <small>process / accounts-payable</small>
+            <small>process / post-project</small>
           </div>
           <div className="visual-content">
             <div className="visual-heading">

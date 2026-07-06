@@ -376,6 +376,48 @@ Content-Type: application/json
 
 ---
 
+## Closed-Loop Recommendations (FR-026)
+
+### Execution pattern selection
+
+`executionPatternFor(node, recommendationClass, events)` returns `"one-shot" | "bounded-loop" | "continuous-monitoring"` by checking:
+- Machine-checkable objective evaluator exists (success/failure results, rule refs)
+- Quick feedback loop (average step duration < 5 minutes)
+- Low-risk and reversible activity
+- No observed exceptions or rework (simplify first)
+
+If any condition fails, pattern defaults to `"one-shot"`.
+
+### Loop configuration
+
+`loopConfigFor(node, recommendationClass, events)` builds a `LoopConfig` when the pattern is `"bounded-loop"`:
+- **Evaluator**: schema validator + business rule check (deterministic) or test suite (probabilistic/hybrid)
+- **Stop conditions**: all checks pass, max iterations reached, no improvement between iterations
+- **Escalation**: two consecutive same-signature failures, compliance/security violation, cost exceeds budget
+- **Failure action**: escalate to human with full trace and diagnostic summary
+- **modelSelfJudges**: always `false`
+
+### Cost estimation
+
+`CostEstimate` captures per-iteration and total-run costs:
+
+```text
+iteration cost = (inputTokens / 1M) * inputPrice + (outputTokens / 1M) * outputPrice + toolCost
+expected run cost = iterationCost * expectedIterations
+worst-case run cost = iterationCost * maxIterations
+```
+
+Defaults: gpt-5.5 pricing ($2.50/$10.00 per 1M tokens), 3–5 expected iterations, 8–15 max. All assumptions (model, pricing source, date, token estimates, tool costs, volume) are stored as editable fields.
+
+### When NOT to recommend a loop
+
+- No objective evaluator → one-shot
+- Observed exceptions/rework → simplify first, then one-shot
+- High-risk or irreversible activity → human-led treatment
+- Subjective quality work without reliable measure → one-shot or human-led
+
+---
+
 ## Requirements Mapping
 
 | Requirement | Design section |
@@ -429,4 +471,11 @@ Live-demo events carry tag `"live-demo"`. Reset filters by this tag. No separate
 Existing project has no Tailwind. Extend `styles.css` with CSS custom properties + media queries.
 
 ### TD-008: SVG graph is custom, not a library
+
+### TD-009: Closed-loop cost model
+
+**Decision:** Use gpt-5.5 pricing as default with all assumptions stored as editable fields. Per-iteration costs decompose into input tokens, output tokens, and tool costs. Expected and worst-case run costs multiply iteration cost by expected/max iterations.
+**Reason:** Users need to evaluate automation ROI before committing. Hard-coded universal pricing would be wrong the moment a model changes price.
+**Trade-off:** Adds complexity to the recommendation data model but prevents misleading cost claims.
+**Alternatives considered:** Hard-coding one model price (rejected — goes stale), omitting costs (rejected — FR-026 requires them).
 Existing graph rendering is custom SVG. Extend it with node interactivity (role=button, keyboard, touch) rather than introducing a new library.
