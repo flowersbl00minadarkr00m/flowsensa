@@ -38,6 +38,30 @@ const FAMILY_BADGE_CLASS: Record<Family, string> = {
   'Insufficient evidence': 'badge family-insufficient',
 };
 
+/** Plain-language meaning of each recommended treatment family. */
+const FAMILY_MEANING: Record<Family, { headline: string; what: string }> = {
+  Automation: {
+    headline: 'Automate this step',
+    what: 'It runs consistently with predictable inputs and outputs, so deterministic rules or code can take it over.',
+  },
+  LLM: {
+    headline: 'Add AI assistance',
+    what: 'An AI model can draft or propose the output, but a person still reviews or approves before it counts.',
+  },
+  Hybrid: {
+    headline: 'Automate with guardrails',
+    what: 'Combine automated execution with deterministic checks that catch and contain errors.',
+  },
+  'Keep Manual': {
+    headline: 'Keep this step human',
+    what: 'The evidence does not support automating it yet — keep it manual, or simplify it before automating.',
+  },
+  'Insufficient evidence': {
+    headline: 'Needs more evidence',
+    what: 'There are not enough observed runs of this step to recommend a direction with confidence.',
+  },
+};
+
 function generateBrief(family: Family, rec: Recommendation): string {
   const header = `# Improvement Brief — ${rec.nodeId}\nFamily: ${family}\nConfidence: ${Math.round(rec.confidence * 100)}%\n\n`;
   if (family === 'Automation') {
@@ -112,7 +136,12 @@ export function ImprovementOpportunities({
     <div className="module-content">
       <div className="module-heading">
         <h2>Improvement Opportunities</h2>
-        <p>Evidence-grounded automation recommendations for each process step.</p>
+        <p>
+          For every step FlowSensa observed in your process, it recommends how to
+          improve it — automate it, add AI assistance, use a guarded hybrid, or
+          keep it manual — and shows the evidence behind that call. Each card is a
+          recommendation you can accept or override.
+        </p>
       </div>
 
       <div className="filter-bar">
@@ -150,10 +179,10 @@ export function ImprovementOpportunities({
             const family = familyFor(rec.recommendationClass);
             return (
               <div key={rec.nodeId} className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.5rem' }}>
                   <div>
                     <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
-                      {node?.activityType ?? 'activity'}
+                      {node?.activityType ?? 'activity'} step
                     </span>
                     <h3 style={{ color: 'var(--text)', margin: '0.1rem 0 0', fontSize: '1rem' }}>
                       {node?.label ?? rec.nodeId}
@@ -162,9 +191,21 @@ export function ImprovementOpportunities({
                   <span className={FAMILY_BADGE_CLASS[family]}>{family}</span>
                 </div>
 
+                {/* Plain-language recommendation */}
+                <div className="rec-summary">
+                  <p className="rec-headline">
+                    <span className="rec-label">Recommendation</span>
+                    {FAMILY_MEANING[family].headline}
+                  </p>
+                  <p className="rec-what">{FAMILY_MEANING[family].what}</p>
+                  {rec.uncertainty && (
+                    <p className="rec-why"><strong>Why:</strong> {rec.uncertainty}</p>
+                  )}
+                </div>
+
                 {/* Confidence bar */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: '80px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.75rem 0' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: '110px' }}>
                     {Math.round(rec.confidence * 100)}% confidence
                   </span>
                   <div className="confidence-bar-wrap">
@@ -172,9 +213,32 @@ export function ImprovementOpportunities({
                   </div>
                 </div>
 
+                {/* Failure modes + controls, if present */}
+                {(rec.expectedFailureModes.length > 0 || rec.requiredControls.length > 0) && (
+                  <details className="rec-details">
+                    <summary>What to watch for before you change this</summary>
+                    <div className="rec-details-grid">
+                      {rec.expectedFailureModes.length > 0 && (
+                        <div>
+                          <h4>Expected failure modes</h4>
+                          <ul>{rec.expectedFailureModes.map(f => <li key={f}>{f}</li>)}</ul>
+                        </div>
+                      )}
+                      {rec.requiredControls.length > 0 && (
+                        <div>
+                          <h4>Required controls</h4>
+                          <ul>{rec.requiredControls.map(c => <li key={c}>{c}</li>)}</ul>
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                )}
+
                 {/* Treatment selector */}
                 <label style={{ display: 'grid', gap: '0.3rem', marginBottom: '0.75rem' }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Treatment</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                    Recommended treatment — change it if you disagree
+                  </span>
                   <select
                     value={rec.recommendationClass}
                     onChange={e => onRecommendationChange(rec.nodeId, e.target.value as RecommendationClass)}

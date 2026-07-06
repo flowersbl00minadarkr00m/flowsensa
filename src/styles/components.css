@@ -356,12 +356,116 @@
   border-radius: 99px;
 }
 
+/* ── Recommendation summary (Improvement Opportunities) ─────── */
+.rec-summary {
+  border-left: 3px solid var(--accent);
+  background: var(--surface-2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.rec-headline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.rec-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-dim, rgba(118, 87, 232, 0.12));
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.rec-what {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.rec-why {
+  margin: 0.4rem 0 0;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.rec-why strong { color: var(--text-muted); }
+
+.rec-details {
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.rec-details summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  padding: 0.2rem 0;
+}
+
+.rec-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.rec-details-grid h4 {
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.rec-details-grid ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .rec-details-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Module Content Wrapper ─────────────────────────────────── */
+/*
+ * The app chrome (sidebar, workspace header) is dark "ink" and relies on the
+ * global near-white --text tokens. The module content area is the light
+ * dashboard canvas, so it re-scopes those tokens to dark-on-light values.
+ * This keeps text legible on the light canvas and makes cards (which use
+ * --surface) light and consistent, without touching the dark chrome.
+ */
 .module-content {
   padding: 1.5rem;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  --text: #1d2333;
+  --text-muted: #545d6e;
+  --text-dim: #79808f;
+  --surface: #ffffff;
+  --surface-2: #eef1f7;
+  --border: #d8dce6;
+  --border-light: #e6e9f1;
+  --success: #0f9d6f;
+  --warning: #b26a12;
+  --danger: #c8384a;
+  --info: #2f6fd0;
   color: var(--text);
   background: var(--bg);
 }

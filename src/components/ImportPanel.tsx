@@ -4,6 +4,8 @@ import type { ValidationIssue } from "../domain/validation";
 interface ImportPanelProps {
   issues: ValidationIssue[];
   importSummary?: string;
+  syncing?: boolean;
+  onSync: () => void;
   onDemo: () => void;
   onInvalidDemo: () => void;
   onFile: (file: File) => void;
@@ -12,6 +14,8 @@ interface ImportPanelProps {
 export function ImportPanel({
   issues,
   importSummary,
+  syncing,
+  onSync,
   onDemo,
   onInvalidDemo,
   onFile,
@@ -33,8 +37,11 @@ export function ImportPanel({
           </p>
         </div>
         <div className="button-row">
-          <button className="primary" type="button" onClick={onDemo}>
-            Explore the demo <span aria-hidden="true">↗</span>
+          <button className="primary" type="button" onClick={onSync} disabled={syncing}>
+            {syncing ? "Syncing…" : "Sync with Mnemosync"} <span aria-hidden="true">↗</span>
+          </button>
+          <button type="button" onClick={onDemo}>
+            Explore sample workspace
           </button>
           <button type="button" onClick={() => inputRef.current?.click()}>
             Import JSON

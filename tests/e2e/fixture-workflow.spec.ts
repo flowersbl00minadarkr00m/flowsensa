@@ -15,10 +15,10 @@ test("complete fixture workflow is keyboard-operable and local", async ({ page }
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Explore the demo" }).click();
+  await page.getByRole("button", { name: "Explore sample workspace" }).click();
   await expect(page.getByText("08", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Creator showcase", { exact: true })).toBeVisible();
-  await expect(page.getByText("Fictional demonstration data", { exact: false })).toBeVisible();
+  await expect(page.getByText("Process workspace")).toBeVisible();
+  await expect(page.getByText("sample data", { exact: false })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("50 accepted");
 
   await page.getByRole("button", { name: "Process Explorer" }).click();
@@ -58,7 +58,7 @@ test("invalid fixture shows event and field errors without replacing valid data"
 test("narrow viewport uses bottom tabs, drawer, and More sheet without overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("button", { name: "Explore the demo" }).click();
+  await page.getByRole("button", { name: "Explore sample workspace" }).click();
 
   for (const name of ["Overview", "Explorer", "Activity", "Improve", "Sources", "More"]) {
     await expect(page.getByRole("button", { name: new RegExp(name) })).toBeVisible();
@@ -81,10 +81,12 @@ test("narrow viewport uses bottom tabs, drawer, and More sheet without overflow"
 
 test("an imported valid file replaces the showcase locally", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Explore the demo" }).click();
+  await page.getByRole("button", { name: "Explore sample workspace" }).click();
+  await expect(page.getByText("· sample data")).toBeVisible();
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles("src/fixtures/sample-work-events.json");
-  await expect(page.getByText("Imported process workspace")).toBeVisible();
-  await expect(page.getByText("Private local data", { exact: false })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Load demo" })).toBeVisible();
+  // Imported non-sample data drops the "sample data" marker from the header.
+  await expect(page.getByText("Process workspace")).toBeVisible();
+  await expect(page.getByText("· sample data")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sync with Mnemosync" })).toBeVisible();
 });

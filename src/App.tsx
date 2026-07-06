@@ -54,6 +54,7 @@ import {
 import invalidFixture from "./fixtures/invalid-work-events.json";
 import primitiveFixture from "./fixtures/work-primitives.json";
 import { showcaseWorkEvents } from "./fixtures/showcase-work-events";
+import { syncFromMnemosync } from "./lib/mnemosyncSync";
 
 type View =
   | "overview"
@@ -136,6 +137,7 @@ export function App() {
   const moreSheetRef = useRef<HTMLDivElement>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [alertUpdates, setAlertUpdates] = useState<Map<string, Alert["status"]>>(new Map());
+  const [syncing, setSyncing] = useState(false);
   const workspaceFileInputRef = useRef<HTMLInputElement>(null);
 
   const gaps = useMemo(
@@ -303,6 +305,19 @@ export function App() {
       setImportSummary(`${label}: import blocked; existing local data was preserved.`);
     }
   }, []);
+
+  const handleSyncMnemosync = useCallback(async () => {
+    setSyncing(true);
+    setImportSummary("Syncing telemetry from Mnemosync…");
+    try {
+      const { collection, rowCount } = await syncFromMnemosync();
+      await importPayload(collection, `Mnemosync sync (${rowCount} events)`);
+    } catch (error) {
+      setImportSummary((error as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  }, [importPayload]);
 
   const handleRunDemo = useCallback(() => {
     const event = emitDemoEvent(demoCounter);
@@ -702,7 +717,9 @@ export function App() {
         <ImportPanel
           issues={issues}
           importSummary={importSummary}
-          onDemo={() => void importPayload(showcaseWorkEvents, "Creator showcase")}
+          syncing={syncing}
+          onSync={() => void handleSyncMnemosync()}
+          onDemo={() => void importPayload(showcaseWorkEvents, "Sample workspace")}
           onInvalidDemo={() => void importPayload(invalidFixture, "Invalid fixture")}
           onFile={(file) => void file.text().then((text) => importPayload(text, file.name))}
         />
@@ -878,11 +895,11 @@ export function App() {
             >
               ☰
             </button>
-            <span className="status-pill">{isShowcase ? "DEMO" : "DATA"}</span>
             <div>
-              <strong>{isShowcase ? "Creator showcase" : "Imported process workspace"}</strong>
+              <strong>Process workspace</strong>
               <span>
-                {isShowcase ? "Fictional demonstration data" : "Private local data"} · schema v{events.schemaVersion}
+                {events.events.length} events · {graph.nodes.length} steps · schema v{events.schemaVersion}
+                {isShowcase ? " · sample data" : ""}
               </span>
             </div>
           </div>
@@ -891,23 +908,22 @@ export function App() {
               {graph.nodes.filter(n => n.status === "confirmed").length} confirmed · {overrides.length} overrides
             </span>
             <button
-              className="btn"
+              className="btn primary"
+              style={{ fontSize: "0.72rem", padding: "0.3rem 0.7rem" }}
+              type="button"
+              onClick={() => void handleSyncMnemosync()}
+              disabled={syncing}
+            >
+              {syncing ? "Syncing…" : "Sync with Mnemosync"}
+            </button>
+            <button
+              className="btn ghost"
               style={{ fontSize: "0.72rem", padding: "0.3rem 0.6rem" }}
               type="button"
               onClick={() => workspaceFileInputRef.current?.click()}
             >
               Import JSON
             </button>
-            {!isShowcase && (
-              <button
-                className="btn ghost"
-                style={{ fontSize: "0.72rem", padding: "0.3rem 0.6rem" }}
-                type="button"
-                onClick={() => void importPayload(showcaseWorkEvents, "Creator showcase")}
-              >
-                Load demo
-              </button>
-            )}
           </div>
         </header>
 
@@ -924,20 +940,6 @@ export function App() {
             event.target.value = "";
           }}
         />
-
-        {isShowcase && (
-          <div className="showcase-banner">
-            <span className="demo-label">DEMO</span>
-            <p>Creator showcase: post creation and software-project delivery. No real data.</p>
-            <button
-              className="btn"
-              type="button"
-              onClick={() => workspaceFileInputRef.current?.click()}
-            >
-              Use your data
-            </button>
-          </div>
-        )}
 
         {issues.length > 0 && (
           <div className="workspace-import-error" role="alert">
