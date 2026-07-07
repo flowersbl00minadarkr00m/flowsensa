@@ -75,9 +75,9 @@ describe("deterministic process reconstruction", () => {
 
   it("derives variants, transitions, handoffs, repeats, exceptions, and outcomes", () => {
     expect(graph.variants).toHaveLength(2);
-    expect(graph.nodes.find((node) => node.id === "validate-invoice")?.repeats).toBe(1);
-    expect(graph.nodes.find((node) => node.id === "validate-invoice")?.exceptions).toBe(1);
-    expect(graph.nodes.find((node) => node.id === "post-invoice")?.acceptedOutcomes).toBe(1);
+    expect(graph.nodes.find((node) => node.id === "validate-request")?.repeats).toBe(1);
+    expect(graph.nodes.find((node) => node.id === "validate-request")?.exceptions).toBe(1);
+    expect(graph.nodes.find((node) => node.id === "post-request")?.acceptedOutcomes).toBe(1);
     expect(graph.edges.some((edge) => edge.handoffs > 0)).toBe(true);
     expect(graph.nodes.every((node) => node.truthState === "inferred")).toBe(true);
   });
@@ -172,7 +172,7 @@ describe("closed-loop recommendations", () => {
     eventId: crypto.randomUUID(),
     caseId: "case-001",
     timestamp: "2026-07-05T12:00:00Z",
-    activity: { id: "validate-invoice", label: "Validate invoice", type: "validate" as const, primitiveVersion: "1.0.0" },
+    activity: { id: "validate-request", label: "Validate request", type: "validate" as const, primitiveVersion: "1.0.0" },
     actor: { id: "agent-pi", label: "Pi", type: "agent" as const },
     result: { status: "success" as const },
     truthState: "observed" as const,
@@ -182,7 +182,7 @@ describe("closed-loop recommendations", () => {
 
   const makeNode = (overrides: Record<string, unknown>) => ({
     id: "node-validate",
-    label: "Validate invoice",
+    label: "Validate request",
     activityType: "validate" as const,
     frequency: 5,
     actorIds: ["agent-pi"],
@@ -202,7 +202,7 @@ describe("closed-loop recommendations", () => {
     const events = [
       baseEvent({ eventId: "ev-1", result: { status: "success" }, acceptedOutcome: true }),
       baseEvent({ eventId: "ev-2", result: { status: "success" }, acceptedOutcome: true }),
-      baseEvent({ eventId: "ev-3", decision: { id: "d1", selectedPath: "Approved", ruleRef: "invoice-total-rule", rationale: "Within threshold" } }),
+      baseEvent({ eventId: "ev-3", decision: { id: "d1", selectedPath: "Approved", ruleRef: "request-total-rule", rationale: "Within threshold" } }),
     ];
     const node = makeNode({});
     const recs = recommendTreatments([node], events);

@@ -4,15 +4,15 @@
   "events": [
     {
       "eventId": "evt-1001-01",
-      "caseId": "invoice-1001",
-      "traceId": "trace-invoice-1001",
+      "caseId": "request-1001",
+      "traceId": "trace-request-1001",
       "timestamp": "2026-07-02T16:00:00Z",
       "sequence": 1,
       "durationMs": 60000,
-      "intent": "Pay an approved supplier invoice accurately and on time.",
+      "intent": "Pay an approved supplier request accurately and on time.",
       "activity": {
-        "id": "receive-invoice",
-        "label": "Receive invoice",
+        "id": "receive-request",
+        "label": "Receive request",
         "type": "intake",
         "primitiveVersion": "1.0.0"
       },
@@ -26,8 +26,8 @@
       "system": { "id": "mail-system", "label": "Mail system", "version": "fixture" },
       "objects": [
         {
-          "id": "inv-1001",
-          "type": "supplier-invoice",
+          "id": "req-1001",
+          "type": "supplier-request",
           "role": "subject",
           "classification": "confidential-fixture"
         }
@@ -55,22 +55,22 @@
     },
     {
       "eventId": "evt-1001-02",
-      "caseId": "invoice-1001",
-      "traceId": "trace-invoice-1001",
+      "caseId": "request-1001",
+      "traceId": "trace-request-1001",
       "parentEventId": "evt-1001-01",
       "timestamp": "2026-07-02T16:03:00Z",
       "sequence": 2,
       "durationMs": 45000,
       "activity": {
-        "id": "extract-invoice",
-        "label": "Extract invoice fields",
+        "id": "extract-request",
+        "label": "Extract request fields",
         "type": "extract",
         "primitiveVersion": "1.0.0"
       },
       "transition": { "fromState": "received", "toState": "extracted" },
       "actor": {
         "id": "agent-extractor",
-        "label": "Invoice extraction agent",
+        "label": "Request extraction agent",
         "type": "agent",
         "role": "Field extraction",
         "authorityLevel": 2
@@ -83,19 +83,19 @@
       },
       "objects": [
         {
-          "id": "inv-1001",
-          "type": "supplier-invoice",
+          "id": "req-1001",
+          "type": "supplier-request",
           "role": "input",
           "classification": "confidential-fixture"
         },
-        { "id": "inv-1001-fields", "type": "invoice-fields", "role": "output" }
+        { "id": "req-1001-fields", "type": "request-fields", "role": "output" }
       ],
       "result": { "status": "success" },
       "evidence": [
         {
-          "id": "evidence-inv-1001",
-          "sourceRef": "fixture://invoice/inv-1001",
-          "label": "Synthetic invoice"
+          "id": "evidence-req-1001",
+          "sourceRef": "fixture://request/req-1001",
+          "label": "Synthetic request"
         }
       ],
       "resources": [
@@ -149,14 +149,14 @@
     },
     {
       "eventId": "evt-1001-03",
-      "caseId": "invoice-1001",
-      "traceId": "trace-invoice-1001",
+      "caseId": "request-1001",
+      "traceId": "trace-request-1001",
       "parentEventId": "evt-1001-02",
       "timestamp": "2026-07-02T16:05:00Z",
       "sequence": 3,
       "durationMs": 5000,
       "activity": {
-        "id": "validate-invoice",
+        "id": "validate-request",
         "label": "Validate required fields and totals",
         "type": "validate",
         "primitiveVersion": "1.0.0"
@@ -164,7 +164,7 @@
       "transition": { "fromState": "extracted", "toState": "validated" },
       "actor": {
         "id": "validation-rules",
-        "label": "Invoice validation rules",
+        "label": "Request validation rules",
         "type": "system",
         "authorityLevel": 2
       },
@@ -177,14 +177,14 @@
         "id": "decision-1001-validation",
         "selectedPath": "pass",
         "rationale": "Required fields present and arithmetic reconciled.",
-        "ruleRef": "fixture://rules/invoice-validation-v1",
+        "ruleRef": "fixture://rules/request-validation-v1",
         "decidingAuthority": "validation-rules"
       },
       "result": { "status": "success" },
       "evidence": [
         {
           "id": "validation-report-1001",
-          "sourceRef": "fixture://validation/invoice-1001",
+          "sourceRef": "fixture://validation/request-1001",
           "label": "Deterministic validation report"
         }
       ],
@@ -199,15 +199,15 @@
     },
     {
       "eventId": "evt-1001-04",
-      "caseId": "invoice-1001",
-      "traceId": "trace-invoice-1001",
+      "caseId": "request-1001",
+      "traceId": "trace-request-1001",
       "parentEventId": "evt-1001-03",
       "timestamp": "2026-07-02T18:30:00Z",
       "sequence": 4,
       "durationMs": 180000,
       "activity": {
-        "id": "approve-invoice",
-        "label": "Approve invoice",
+        "id": "approve-request",
+        "label": "Approve request",
         "type": "review",
         "primitiveVersion": "1.0.0"
       },
@@ -230,7 +230,7 @@
       "evidence": [
         {
           "id": "approval-evidence-1001",
-          "sourceRef": "fixture://approval/invoice-1001",
+          "sourceRef": "fixture://approval/request-1001",
           "label": "Synthetic approval record"
         }
       ],
@@ -263,22 +263,22 @@
     },
     {
       "eventId": "evt-1001-05",
-      "caseId": "invoice-1001",
-      "traceId": "trace-invoice-1001",
+      "caseId": "request-1001",
+      "traceId": "trace-request-1001",
       "parentEventId": "evt-1001-04",
       "timestamp": "2026-07-02T18:35:00Z",
       "sequence": 5,
       "durationMs": 12000,
       "activity": {
-        "id": "post-invoice",
-        "label": "Post approved invoice",
+        "id": "post-request",
+        "label": "Post approved request",
         "type": "execute",
         "primitiveVersion": "1.0.0"
       },
       "transition": { "fromState": "approved", "toState": "posted" },
       "actor": {
         "id": "posting-service",
-        "label": "Invoice posting service",
+        "label": "Request posting service",
         "type": "service-account",
         "authorityLevel": 6
       },
@@ -287,7 +287,7 @@
       "evidence": [
         {
           "id": "posting-receipt-1001",
-          "sourceRef": "fixture://erp/posting/invoice-1001",
+          "sourceRef": "fixture://erp/posting/request-1001",
           "label": "Synthetic posting receipt"
         }
       ],
@@ -313,14 +313,14 @@
     },
     {
       "eventId": "evt-1002-01",
-      "caseId": "invoice-1002",
-      "traceId": "trace-invoice-1002",
+      "caseId": "request-1002",
+      "traceId": "trace-request-1002",
       "timestamp": "2026-07-02T17:00:00Z",
       "sequence": 1,
       "durationMs": 55000,
       "activity": {
-        "id": "receive-invoice",
-        "label": "Receive invoice",
+        "id": "receive-request",
+        "label": "Receive request",
         "type": "intake",
         "primitiveVersion": "1.0.0"
       },
@@ -343,22 +343,22 @@
     },
     {
       "eventId": "evt-1002-02",
-      "caseId": "invoice-1002",
-      "traceId": "trace-invoice-1002",
+      "caseId": "request-1002",
+      "traceId": "trace-request-1002",
       "parentEventId": "evt-1002-01",
       "timestamp": "2026-07-02T17:02:00Z",
       "sequence": 2,
       "durationMs": 41000,
       "activity": {
-        "id": "extract-invoice",
-        "label": "Extract invoice fields",
+        "id": "extract-request",
+        "label": "Extract request fields",
         "type": "extract",
         "primitiveVersion": "1.0.0"
       },
       "transition": { "fromState": "received", "toState": "extracted" },
       "actor": {
         "id": "agent-extractor",
-        "label": "Invoice extraction agent",
+        "label": "Request extraction agent",
         "type": "agent",
         "role": "Field extraction",
         "authorityLevel": 2
@@ -397,14 +397,14 @@
     },
     {
       "eventId": "evt-1002-03",
-      "caseId": "invoice-1002",
-      "traceId": "trace-invoice-1002",
+      "caseId": "request-1002",
+      "traceId": "trace-request-1002",
       "parentEventId": "evt-1002-02",
       "timestamp": "2026-07-02T17:04:00Z",
       "sequence": 3,
       "durationMs": 5000,
       "activity": {
-        "id": "validate-invoice",
+        "id": "validate-request",
         "label": "Validate required fields and totals",
         "type": "validate",
         "primitiveVersion": "1.0.0"
@@ -412,15 +412,15 @@
       "transition": { "fromState": "extracted", "toState": "validation-exception" },
       "actor": {
         "id": "validation-rules",
-        "label": "Invoice validation rules",
+        "label": "Request validation rules",
         "type": "system",
         "authorityLevel": 2
       },
       "decision": {
         "id": "decision-1002-validation",
         "selectedPath": "exception",
-        "rationale": "Invoice total did not reconcile to line items.",
-        "ruleRef": "fixture://rules/invoice-validation-v1",
+        "rationale": "Request total did not reconcile to line items.",
+        "ruleRef": "fixture://rules/request-validation-v1",
         "decidingAuthority": "validation-rules"
       },
       "result": {
@@ -431,7 +431,7 @@
       "evidence": [
         {
           "id": "validation-report-1002",
-          "sourceRef": "fixture://validation/invoice-1002",
+          "sourceRef": "fixture://validation/request-1002",
           "label": "Deterministic exception report"
         }
       ],
@@ -446,15 +446,15 @@
     },
     {
       "eventId": "evt-1002-04",
-      "caseId": "invoice-1002",
-      "traceId": "trace-invoice-1002",
+      "caseId": "request-1002",
+      "traceId": "trace-request-1002",
       "parentEventId": "evt-1002-03",
       "timestamp": "2026-07-03T16:00:00Z",
       "sequence": 4,
       "durationMs": 420000,
       "activity": {
-        "id": "resolve-invoice-exception",
-        "label": "Resolve invoice exception",
+        "id": "resolve-request-exception",
+        "label": "Resolve request exception",
         "type": "review",
         "primitiveVersion": "1.0.0"
       },
@@ -470,7 +470,7 @@
       "evidence": [
         {
           "id": "correction-1002",
-          "sourceRef": "fixture://correction/invoice-1002",
+          "sourceRef": "fixture://correction/request-1002",
           "label": "Synthetic correction record"
         }
       ],
@@ -503,14 +503,14 @@
     },
     {
       "eventId": "evt-1002-05",
-      "caseId": "invoice-1002",
-      "traceId": "trace-invoice-1002",
+      "caseId": "request-1002",
+      "traceId": "trace-request-1002",
       "parentEventId": "evt-1002-04",
       "timestamp": "2026-07-03T16:08:00Z",
       "sequence": 5,
       "durationMs": 5000,
       "activity": {
-        "id": "validate-invoice",
+        "id": "validate-request",
         "label": "Validate required fields and totals",
         "type": "validate",
         "primitiveVersion": "1.0.0"
@@ -518,15 +518,15 @@
       "transition": { "fromState": "corrected", "toState": "validated" },
       "actor": {
         "id": "validation-rules",
-        "label": "Invoice validation rules",
+        "label": "Request validation rules",
         "type": "system",
         "authorityLevel": 2
       },
       "decision": {
         "id": "decision-1002-revalidation",
         "selectedPath": "pass",
-        "rationale": "Corrected invoice reconciled.",
-        "ruleRef": "fixture://rules/invoice-validation-v1",
+        "rationale": "Corrected request reconciled.",
+        "ruleRef": "fixture://rules/request-validation-v1",
         "decidingAuthority": "validation-rules"
       },
       "result": { "status": "retry", "reasonCode": "REVALIDATED", "retryCount": 1 },

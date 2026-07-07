@@ -39,11 +39,11 @@ export function DataSources({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <span className="badge demo-badge">DEMO</span>
-              <h3 style={{ margin: 0 }}>Creator Showcase (Demo)</h3>
+              <span className="badge demo-badge">SANDBOX</span>
+              <h3 style={{ margin: 0 }}>Activity generator</h3>
             </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: 0 }}>
-              Fictional 4-step LinkedIn → code → review → publish workflow. No real data.
+              Emit synthetic work events to watch the pipeline update live. Sandbox only — no real data.
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
