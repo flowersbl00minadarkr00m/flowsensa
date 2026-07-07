@@ -86,6 +86,7 @@
 .process-toolbar select,
 .process-toolbar input,
 .form-grid input,
+.form-grid select,
 .detail-rename input,
 .prompt-row textarea {
   min-height: 2.15rem;

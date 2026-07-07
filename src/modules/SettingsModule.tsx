@@ -42,6 +42,21 @@ Authorization: Bearer {apiKey}`;
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const OPENROUTER_MODEL = 'openai/gpt-4.1';
 
+const SUGGESTED_MODELS = [
+  { label: 'OpenAI GPT-4.1', value: 'openai/gpt-4.1' },
+  { label: 'OpenAI GPT-4.1 mini', value: 'openai/gpt-4.1-mini' },
+  { label: 'OpenAI o4-mini', value: 'openai/o4-mini' },
+  { label: 'Anthropic Claude Sonnet 4', value: 'anthropic/claude-sonnet-4' },
+  { label: 'Anthropic Claude 3.7 Sonnet', value: 'anthropic/claude-3.7-sonnet' },
+  { label: 'Google Gemini 2.5 Pro', value: 'google/gemini-2.5-pro' },
+  { label: 'Google Gemini 2.5 Flash', value: 'google/gemini-2.5-flash' },
+  { label: 'Meta Llama 3.3 70B Instruct', value: 'meta-llama/llama-3.3-70b-instruct' },
+  { label: 'Mistral Large', value: 'mistralai/mistral-large' },
+  { label: 'DeepSeek Chat', value: 'deepseek/deepseek-chat' },
+  { label: 'Qwen 2.5 72B Instruct', value: 'qwen/qwen-2.5-72b-instruct' },
+  { label: 'Perplexity Sonar Pro', value: 'perplexity/sonar-pro' },
+];
+
 export function SettingsModule({
   llmProfile,
   onLLMProfileChange,
@@ -56,6 +71,7 @@ export function SettingsModule({
   const [showKey, setShowKey] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testLoading, setTestLoading] = useState(false);
+  const selectedSuggestedModel = SUGGESTED_MODELS.some((model) => model.value === modelInput) ? modelInput : '';
 
   const canSave = nameInput.trim() && keyInput.trim() && baseUrlInput.trim() && modelInput.trim();
 
@@ -125,6 +141,20 @@ export function SettingsModule({
               <label>
                 Model or deployment
                 <input value={modelInput} onChange={(event) => setModelInput(event.target.value)} placeholder="gpt-4.1, llama-3.1, provider/model..." />
+              </label>
+              <label>
+                Suggested model
+                <select
+                  value={selectedSuggestedModel}
+                  onChange={(event) => {
+                    if (event.target.value) setModelInput(event.target.value);
+                  }}
+                >
+                  <option value="">Custom model or deployment</option>
+                  {SUGGESTED_MODELS.map((model) => (
+                    <option key={model.value} value={model.value}>{model.label}</option>
+                  ))}
+                </select>
               </label>
               <label>
                 API key
