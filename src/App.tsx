@@ -10,6 +10,7 @@ import { ActivityLog } from "./modules/ActivityLog";
 import { PerformanceAnalysis } from "./modules/PerformanceAnalysis";
 import { ImprovementOpportunities } from "./modules/ImprovementOpportunities";
 import { ProcessRisks } from "./modules/ProcessRisks";
+import { ResourceUsage } from "./modules/ResourceUsage";
 import { AlertsModule } from "./modules/AlertsModule";
 import { AIAnalyst } from "./modules/AIAnalyst";
 import { DataSources } from "./modules/DataSources";
@@ -41,6 +42,7 @@ import { importBpmnAsEvents } from "./domain/bpmnImport";
 import { buildTaskInsights } from "./domain/processInsights";
 import { createDefaultProcessMetadata } from "./domain/processMetadata";
 import { buildProcessRisks } from "./domain/processRisks";
+import { buildResourceUsage } from "./domain/resourceUsage";
 import { createImageProcessExtractionRequest } from "./domain/imageProcessImport";
 import type {
   FlowExport,
@@ -70,6 +72,7 @@ type View =
   | "risks"
   | "variants"
   | "activity"
+  | "resources"
   | "performance"
   | "improvements"
   | "alerts"
@@ -88,19 +91,20 @@ const NAV_ITEMS: Array<{ id: View; label: string; number: string; group: "primar
   { id: "risks", label: "Process Risks", number: "02", group: "primary" },
   { id: "improvements", label: "Process Enhancements", number: "03", group: "primary" },
   { id: "activity", label: "Evidence Log", number: "04", group: "primary" },
-  { id: "variants", label: "Variants", number: "05", group: "advanced" },
-  { id: "performance", label: "Performance", number: "06", group: "advanced" },
-  { id: "alerts", label: "Alerts", number: "07", group: "advanced" },
-  { id: "analyst", label: "AI Insights", number: "08", group: "advanced" },
-  { id: "sources", label: "Data", number: "09", group: "advanced" },
-  { id: "settings", label: "Settings", number: "10", group: "advanced" },
+  { id: "resources", label: "Resource Usage", number: "05", group: "advanced" },
+  { id: "variants", label: "Variants", number: "06", group: "advanced" },
+  { id: "performance", label: "Performance", number: "07", group: "advanced" },
+  { id: "alerts", label: "Alerts", number: "08", group: "advanced" },
+  { id: "analyst", label: "AI Insights", number: "09", group: "advanced" },
+  { id: "sources", label: "Data", number: "10", group: "advanced" },
+  { id: "settings", label: "Settings", number: "11", group: "advanced" },
 ] as const;
 
 const PRIMARY_NAV_ITEMS = NAV_ITEMS.filter((item) => item.group === "primary");
 const ADVANCED_NAV_ITEMS = NAV_ITEMS.filter((item) => item.group === "advanced");
 
 const BOTTOM_TABS: View[] = ["explorer", "risks", "improvements", "activity", "sources"];
-const MORE_ITEMS: View[] = ["variants", "performance", "alerts", "analyst", "settings"];
+const MORE_ITEMS: View[] = ["resources", "variants", "performance", "alerts", "analyst", "settings"];
 
 const TAB_LABELS: Record<View, string> = {
   overview: "Overview",
@@ -108,6 +112,7 @@ const TAB_LABELS: Record<View, string> = {
   risks: "Risks",
   variants: "Variants",
   activity: "Evidence",
+  resources: "Resources",
   performance: "Perf",
   improvements: "Enhance",
   alerts: "Alerts",
@@ -231,6 +236,11 @@ export function App() {
   const processRisks = useMemo(
     () => processMetadata ? buildProcessRisks(processMetadata, taskInsights, recommendations) : [],
     [processMetadata, taskInsights, recommendations],
+  );
+
+  const resourceUsage = useMemo(
+    () => buildResourceUsage(events?.events ?? [], graph?.nodes ?? []),
+    [events, graph],
   );
 
   const flowExport = useMemo<FlowExport | undefined>(() => {
@@ -825,6 +835,13 @@ export function App() {
     loadShowcaseWorkspace("Local workspace deleted. Sample workspace loaded locally.");
   }, []);
 
+  const handleClearSampleAndImport = useCallback(async () => {
+    await clearWorkspace();
+    setDemoCounter(0);
+    setImportSummary("Synthetic sample cleared from browser storage. Choose a telemetry JSON, BPMN, XML, or process image to import.");
+    workspaceFileInputRef.current?.click();
+  }, []);
+
   if (!hydrated) {
     return (
       <main id="main" className="loading-shell" aria-busy="true">
@@ -1043,7 +1060,7 @@ export function App() {
               <strong>Process Workspace</strong>
               <span>
                 {events.events.length} events · {graph.nodes.length} steps · schema v{events.schemaVersion}
-                {isShowcase ? " · sample data" : ""}
+                {isShowcase ? " · Synthetic sample data loaded locally" : ""}
               </span>
             </div>
           </div>
@@ -1095,6 +1112,17 @@ export function App() {
             {importSummary}
           </div>
         )}
+        {isShowcase && (
+          <div className="sample-data-banner" role="status">
+            <div>
+              <strong>Synthetic sample data loaded locally</strong>
+              <span>This browser is showing bundled demo events, not shared production data. Import your own telemetry to replace it.</span>
+            </div>
+            <button className="btn primary" type="button" onClick={() => void handleClearSampleAndImport()}>
+              Clear sample and import your telemetry
+            </button>
+          </div>
+        )}
 
         {/* Module views */}
         {view === "overview" && (
@@ -1142,6 +1170,9 @@ export function App() {
         )}
         {view === "activity" && (
           <ActivityLog activityLog={activityLog} onOpenEvent={setSelectedEventId} />
+        )}
+        {view === "resources" && (
+          <ResourceUsage usage={resourceUsage} onOpenEvent={setSelectedEventId} />
         )}
         {view === "performance" && (
           <PerformanceAnalysis graph={graph} events={events.events} kpis={kpis} />

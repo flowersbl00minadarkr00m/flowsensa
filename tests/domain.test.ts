@@ -15,6 +15,7 @@ import { importBpmnAsEvents } from "../src/domain/bpmnImport";
 import { buildTaskInsights } from "../src/domain/processInsights";
 import { createDefaultProcessMetadata } from "../src/domain/processMetadata";
 import { buildProcessRisks } from "../src/domain/processRisks";
+import { buildResourceUsage } from "../src/domain/resourceUsage";
 import { recommendTreatments } from "../src/domain/recommendations";
 import {
   validatePrimitiveRegistry,
@@ -26,6 +27,7 @@ import primitiveFixture from "../src/fixtures/work-primitives.json";
 import { showcaseWorkEvents } from "../src/fixtures/showcase-work-events";
 import type {
   PrimitiveRegistry,
+  WorkEvent,
   WorkEventCollection,
 } from "../src/domain/types";
 
@@ -234,6 +236,56 @@ describe("operational context workspace", () => {
     expect(json).toContain("Renamed task");
     expect(json).toContain("originalLabel");
     expect(markdown).toContain("| Display name | Original label |");
+  });
+});
+
+describe("resource usage", () => {
+  const baseResourceEvent = (overrides: Partial<WorkEvent>): WorkEvent => ({
+    eventId: "resource-ev-1",
+    caseId: "case-resource",
+    timestamp: "2026-07-07T12:00:00Z",
+    activity: { id: "draft", label: "Draft", type: "execute" },
+    actor: { id: "agent-codex", label: "Codex", type: "agent" },
+    system: { id: "openai-api", label: "OpenAI API", tool: "codex", model: "openai/gpt-4.1" },
+    result: { status: "success" },
+    truthState: "observed",
+    provenance: { sourceType: "manual", sourceRef: "test://resource", ingestedAt: "2026-07-07T12:00:00Z" },
+    ...overrides,
+  });
+
+  it("aggregates actual provider resource telemetry separately from estimates", () => {
+    const events = [
+      baseResourceEvent({
+        eventId: "actual-1",
+        resources: [
+          { kind: "input-tokens", value: 1500, unit: "tokens", measurementClass: "provider-reported", sourceRef: "usage://actual-1" },
+          { kind: "output-tokens", value: 500, unit: "tokens", measurementClass: "provider-reported", sourceRef: "usage://actual-1" },
+          { kind: "financial", value: 0.01, unit: "USD", measurementClass: "metered", sourceRef: "usage://actual-1" },
+        ],
+      }),
+      baseResourceEvent({
+        eventId: "estimated-1",
+        resources: [
+          { kind: "input-tokens", value: 900, unit: "tokens", measurementClass: "estimated", sourceRef: "usage://estimated-1" },
+        ],
+      }),
+      baseResourceEvent({ eventId: "missing-1", resources: undefined }),
+    ];
+
+    const usage = buildResourceUsage(events);
+    expect(usage.overallTokens.actual).toBe(2000);
+    expect(usage.overallTokens.estimated).toBe(900);
+    expect(usage.overallCost.actual).toBe(0.01);
+    expect(usage.resourceEventCount).toBe(2);
+    expect(usage.agentOrModelMissingResourceCount).toBe(1);
+    expect(usage.byModel[0]!.model).toBe("openai/gpt-4.1");
+  });
+
+  it("shows synthetic showcase resources as estimated, not actual", () => {
+    const usage = buildResourceUsage(showcaseWorkEvents.events, discoverProcess(showcaseWorkEvents).nodes);
+    expect(usage.overallTokens.estimated).toBeGreaterThan(0);
+    expect(usage.overallTokens.actual).toBe(0);
+    expect(usage.byModel.length).toBeGreaterThan(0);
   });
 });
 

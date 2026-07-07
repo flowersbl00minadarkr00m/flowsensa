@@ -1,6 +1,7 @@
 import type {
   Activity,
   Actor,
+  ResourceMeasurement,
   WorkEvent,
   WorkEventCollection,
 } from "../domain/types";
@@ -39,6 +40,12 @@ const ACTORS = {
   substack:     { id: "substack-platform",  label: "Substack",               type: "external" as const, role: "Content platform", authorityLevel: 3 },
 } as const satisfies Record<string, Actor>;
 
+const AGENT_SYSTEMS: Partial<Record<keyof typeof ACTORS, NonNullable<WorkEvent["system"]>>> = {
+  pi: { id: "openai-api", label: "OpenAI API", tool: "pi", model: "openai/gpt-4.1" },
+  codex: { id: "openai-api", label: "OpenAI API", tool: "codex", model: "openai/gpt-5-codex" },
+  claude: { id: "anthropic-api", label: "Anthropic API", tool: "claude-code", model: "anthropic/claude-sonnet-4.5" },
+};
+
 // ── Post creation lifecycle ─────────────────────────────────────────────────
 
 interface DemoStep {
@@ -59,6 +66,61 @@ interface DemoCase {
   intent: string;
   steps: DemoStep[];
   tags: string[];
+}
+
+function systemFor(actorId: keyof typeof ACTORS): WorkEvent["system"] | undefined {
+  if (AGENT_SYSTEMS[actorId]) return AGENT_SYSTEMS[actorId];
+  if (["vite", "git", "vercel", "tests", "lint", "supabase", "linkedin", "substack"].includes(actorId)) {
+    return { id: `${actorId}-system`, label: ACTORS[actorId].label, version: "showcase-v2" };
+  }
+  return undefined;
+}
+
+function resourcesFor(step: DemoStep, eventId: string): ResourceMeasurement[] | undefined {
+  const actor = ACTORS[step.actorId];
+  if (actor.type === "agent") {
+    const inputTokens = Math.max(900, Math.round(step.durationMs / 120));
+    const outputTokens = Math.max(240, Math.round(step.durationMs / 420));
+    return [
+      {
+        kind: "input-tokens",
+        value: inputTokens,
+        unit: "tokens",
+        measurementClass: "estimated",
+        allocationMethod: "Synthetic demo estimate based on step duration.",
+        sourceRef: `demo://resource/${eventId}/input`,
+      },
+      {
+        kind: "output-tokens",
+        value: outputTokens,
+        unit: "tokens",
+        measurementClass: "estimated",
+        allocationMethod: "Synthetic demo estimate based on step duration.",
+        sourceRef: `demo://resource/${eventId}/output`,
+      },
+      {
+        kind: "financial",
+        value: Number(((inputTokens / 1_000_000) * 2.5 + (outputTokens / 1_000_000) * 10).toFixed(4)),
+        unit: "USD",
+        measurementClass: "estimated",
+        allocationMethod: "Synthetic demo token price estimate; not provider billing.",
+        sourceRef: `demo://resource/${eventId}/cost`,
+      },
+    ];
+  }
+  if (actor.type === "human") {
+    return [
+      {
+        kind: "human-time",
+        value: Number((step.durationMs / 60_000).toFixed(1)),
+        unit: "minutes",
+        measurementClass: "estimated",
+        allocationMethod: "Synthetic demo duration estimate.",
+        sourceRef: `demo://resource/${eventId}/human-time`,
+      },
+    ];
+  }
+  return undefined;
 }
 
 const postCreationStandard: DemoStep[] = [
@@ -194,9 +256,7 @@ function buildCase(demoCase: DemoCase): WorkEvent[] {
       activity,
       transition: { fromState: step.fromState, toState: step.toState },
       actor: ACTORS[step.actorId],
-      system: ["vite", "git", "vercel", "tests", "lint", "supabase", "linkedin", "substack"].includes(step.actorId)
-        ? { id: `${step.actorId}-system`, label: ACTORS[step.actorId].label, version: "showcase-v2" }
-        : undefined,
+      system: systemFor(step.actorId),
       decision: hasDecision
         ? {
             id: `${eventId}-decision`,
@@ -213,6 +273,7 @@ function buildCase(demoCase: DemoCase): WorkEvent[] {
         reasonCode: step.reasonCode,
         retryCount: step.status === "retry" ? 1 : undefined,
       },
+      resources: resourcesFor(step, eventId),
       acceptedOutcome: step.acceptedOutcome ?? false,
       truthState: "observed",
       provenance: {

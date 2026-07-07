@@ -65,7 +65,7 @@ test("Sync with Mnemosync imports telemetry from the shared Supabase table", asy
 
   await expect(page.locator(".workspace-import-status")).toContainText("accepted, 0 rejected");
   await expect(page.getByText("Process Workspace")).toBeVisible();
-  await expect(page.getByText("sample data")).toHaveCount(0);
+  await expect(page.getByText("Synthetic sample data loaded locally")).toHaveCount(0);
 
   await page.getByRole("button", { name: /Evidence Log/ }).click();
   await expect(page.getByText("gpt-4.1")).toBeVisible();
