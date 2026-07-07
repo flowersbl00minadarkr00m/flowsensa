@@ -26,6 +26,14 @@ test("complete fixture workflow is keyboard-operable and local", async ({ page }
 
   await page.getByRole("button", { name: /Process Enhancements/ }).click();
   await expect(page.getByRole("heading", { name: "Process Enhancements" })).toBeVisible();
+  await expect(page.locator(".opportunity-card.expanded")).toHaveCount(1);
+  await expect(page.locator(".opportunity-card.compact").first()).toBeVisible();
+  await expect(page.getByText("1. What the enhancement is")).toHaveCount(1);
+  await expect(page.getByText("2. What it addresses")).toHaveCount(1);
+  await expect(page.getByText("3. How to implement it")).toHaveCount(1);
+  await expect(page.getByText("Expected benefit")).toHaveCount(1);
+  await page.getByRole("button", { name: "Show guidance" }).first().click();
+  await expect(page.locator(".opportunity-card.expanded")).toHaveCount(1);
   await expect(page.getByText("Responsibility and control gaps")).toBeVisible();
   await page.locator(".filter-bar select").selectOption("Automation");
   await expect(page.getByRole("heading", { name: "Draft post" })).toBeVisible();

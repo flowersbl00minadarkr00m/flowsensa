@@ -13,6 +13,13 @@ interface Props {
 
 type Family = 'Automation' | 'LLM' | 'Hybrid' | 'Keep Manual' | 'Insufficient evidence';
 
+interface EnhancementGuidance {
+  change: string;
+  addresses: string;
+  implementation: string[];
+  benefit: string;
+}
+
 function familyFor(cls: RecommendationClass): Family {
   if (cls === 'Deterministic automation') return 'Automation';
   if (
@@ -57,6 +64,103 @@ const FAMILY_MEANING: Record<Family, { headline: string; what: string }> = {
     what: 'There are not enough observed runs of this step to recommend a direction with confidence.',
   },
 };
+
+function describeSignals(node: GraphNode | undefined, rec: Recommendation): string[] {
+  const signals: string[] = [];
+  if (node?.exceptions) signals.push(`${node.exceptions} exception${node.exceptions === 1 ? '' : 's'}`);
+  if (node?.repeats) signals.push(`${node.repeats} repeat${node.repeats === 1 ? '' : 's'} or rework signal${node.repeats === 1 ? '' : 's'}`);
+  if ((node?.actorTypes.length ?? 0) > 1) signals.push('handoffs across human, agent, or system actors');
+  if ((node?.confidence ?? rec.confidence) < 0.75) signals.push('lower-confidence telemetry');
+  if (rec.expectedFailureModes.length > 0) signals.push(rec.expectedFailureModes[0].toLowerCase());
+  return signals;
+}
+
+function buildGuidance(family: Family, rec: Recommendation, node: GraphNode | undefined): EnhancementGuidance {
+  const task = node?.label ?? rec.nodeId;
+  const signalText = describeSignals(node, rec).slice(0, 3).join(', ');
+  const evidenceCount = rec.evidenceEventIds.length;
+  const evidencePhrase = evidenceCount > 0
+    ? `${evidenceCount} source event${evidenceCount === 1 ? '' : 's'}`
+    : 'the currently available process map';
+  const firstControl = rec.requiredControls[0] ?? 'Keep an evidence review before rollout.';
+  const secondControl = rec.requiredControls[1] ?? 'Start with a reversible pilot before making it standard.';
+
+  if (family === 'Automation') {
+    return {
+      change: `Turn "${task}" into a rule-based step that runs the same way every time.`,
+      addresses: signalText
+        ? `This addresses ${signalText}. The recommendation is based on ${evidencePhrase}, so start narrow and keep the output checkable.`
+        : `This addresses repeatable work that appears stable enough to check with ${evidencePhrase}.`,
+      implementation: [
+        'Write down the exact trigger: when should this step start?',
+        'List the required inputs and the one acceptable output.',
+        `Add the control gate: ${firstControl}`,
+        'Run it beside the current manual step for a few cases before replacing the manual path.',
+      ],
+      benefit: 'Less manual repetition and fewer missed handoffs, without asking a model to make judgment calls.',
+    };
+  }
+
+  if (family === 'LLM') {
+    return {
+      change: `Use an LLM to draft or summarize "${task}", but keep the person as the decision owner.`,
+      addresses: signalText
+        ? `This addresses ${signalText}. The model should reduce preparation effort, not approve the work.`
+        : 'This addresses work where language, summarization, or comparison may help but the final answer still needs human judgment.',
+      implementation: [
+        'Create a short prompt template with the evidence the model is allowed to use.',
+        'Require the model to label assumptions and unanswered questions.',
+        `Add the review rule: ${firstControl}`,
+        'Only save the result after a person accepts, edits, or rejects it.',
+      ],
+      benefit: 'Faster drafting and review preparation while keeping accountability with the human owner.',
+    };
+  }
+
+  if (family === 'Hybrid') {
+    return {
+      change: `Split "${task}" into a guarded workflow: deterministic checks first, AI help second, human approval last.`,
+      addresses: signalText
+        ? `This addresses ${signalText}. A hybrid pattern gives leverage without letting uncertain model output move unchecked.`
+        : 'This addresses work that can benefit from AI support but still needs explicit gates, evidence, and stop conditions.',
+      implementation: [
+        'Define the non-negotiable checks the system must run before any model call.',
+        'Use the model only for a bounded job, such as drafting, comparison, or exception explanation.',
+        `Add the stop condition: ${firstControl}`,
+        `Add the human gate: ${secondControl}`,
+      ],
+      benefit: 'More throughput on complex steps while preserving evidence, reversibility, and human control.',
+    };
+  }
+
+  if (family === 'Keep Manual') {
+    return {
+      change: `Keep "${task}" human-owned for now, and simplify the step before introducing tools.`,
+      addresses: signalText
+        ? `This addresses ${signalText}. Automating now could lock in an unclear or risky process.`
+        : 'This addresses work where judgment, unclear ownership, or weak telemetry makes automation premature.',
+      implementation: [
+        'Clarify who owns the decision and what evidence they need.',
+        'Remove duplicate approvals, unclear handoffs, or unused outputs.',
+        `Keep this control visible: ${firstControl}`,
+        'Review again after more cases are logged.',
+      ],
+      benefit: 'Reduces process noise before money or effort goes into automation.',
+    };
+  }
+
+  return {
+    change: `Do not implement an enhancement for "${task}" yet.`,
+    addresses: 'The current telemetry is not strong enough to distinguish a real improvement from a guess.',
+    implementation: [
+      'Capture more examples of the step across cases.',
+      'Record who performs it, what evidence changes, and what counts as success.',
+      'Confirm whether failures, waits, and handoffs are real patterns or one-off events.',
+      'Re-run Process Enhancements after the evidence base improves.',
+    ],
+    benefit: 'Avoids premature automation and gives the next recommendation enough context to be trusted.',
+  };
+}
 
 function generateBrief(family: Family, rec: Recommendation): string {
   const controls = rec.requiredControls.map((control) => `- ${control}`).join('\n') || '- Evidence review';
@@ -163,6 +267,7 @@ export function ImprovementOpportunities({
 }: Props) {
   const [familyFilter, setFamilyFilter] = useState<Family | ''>('');
   const [minConfidence, setMinConfidence] = useState(0);
+  const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
   const [mnemosyncRec, setMnemosyncRec] = useState<Recommendation | null>(null);
   const confirmedNodes = nodes.filter((node) => node.status === 'confirmed').length;
   const recommendationsAreProvisional = confirmedNodes === 0;
@@ -173,6 +278,9 @@ export function ImprovementOpportunities({
     if (rec.confidence < minConfidence / 100) return false;
     return true;
   });
+  const expandedRecommendationId = filtered.some((rec) => rec.nodeId === expandedNodeId)
+    ? expandedNodeId
+    : filtered[0]?.nodeId ?? null;
 
   const families: Family[] = ['Automation', 'LLM', 'Hybrid', 'Keep Manual', 'Insufficient evidence'];
 
@@ -227,14 +335,26 @@ export function ImprovementOpportunities({
           {filtered.map((rec) => {
             const node = nodes.find((candidate) => candidate.id === rec.nodeId);
             const family = familyFor(rec.recommendationClass);
+            const guidance = buildGuidance(family, rec, node);
+            const isExpanded = rec.nodeId === expandedRecommendationId;
             return (
-              <div key={rec.nodeId} className="card opportunity-card">
+              <div key={rec.nodeId} className={`card opportunity-card ${isExpanded ? 'expanded' : 'compact'}`}>
                 <div className="opportunity-header">
                   <div>
                     <span className="opportunity-type">{node?.activityType ?? 'activity'} step</span>
                     <h3>{node?.label ?? rec.nodeId}</h3>
                   </div>
-                  <span className={FAMILY_BADGE_CLASS[family]}>{family}</span>
+                  <div className="opportunity-actions">
+                    <span className={FAMILY_BADGE_CLASS[family]}>{family}</span>
+                    <button
+                      className="btn ghost"
+                      type="button"
+                      aria-expanded={isExpanded}
+                      onClick={() => setExpandedNodeId(isExpanded ? filtered[0]?.nodeId ?? rec.nodeId : rec.nodeId)}
+                    >
+                      {isExpanded ? 'Expanded' : 'Show guidance'}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="rec-summary">
@@ -247,6 +367,34 @@ export function ImprovementOpportunities({
                     <p className="rec-why"><strong>Evidence note:</strong> {rec.uncertainty}</p>
                   )}
                 </div>
+
+                {isExpanded ? (
+                  <div className="enhancement-guidance" aria-label={`Guidance for ${node?.label ?? rec.nodeId}`}>
+                    <section>
+                      <span>1. What the enhancement is</span>
+                      <p>{guidance.change}</p>
+                    </section>
+                    <section>
+                      <span>2. What it addresses</span>
+                      <p>{guidance.addresses}</p>
+                    </section>
+                    <section>
+                      <span>3. How to implement it</span>
+                      <ol>
+                        {guidance.implementation.map((step) => <li key={step}>{step}</li>)}
+                      </ol>
+                    </section>
+                    <section>
+                      <span>Expected benefit</span>
+                      <p>{guidance.benefit}</p>
+                    </section>
+                  </div>
+                ) : (
+                  <div className="enhancement-compact-summary">
+                    <p><strong>What:</strong> {guidance.change}</p>
+                    <p><strong>Addresses:</strong> {guidance.addresses}</p>
+                  </div>
+                )}
 
                 <div className="confidence-row-compact">
                   <span>{Math.round(rec.confidence * 100)}% confidence</span>
