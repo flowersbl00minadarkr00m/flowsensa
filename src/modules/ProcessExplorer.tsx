@@ -1,14 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ConfirmView } from '../components/ConfirmView';
-import type { GraphEdge, GraphNode, OverrideRecord, PrimitiveRegistry, ProcessGraph, WorkEvent } from '../domain/types';
+import type {
+  GraphEdge,
+  GraphNode,
+  OverrideRecord,
+  PrimitiveRegistry,
+  ProcessGraph,
+  ProcessMetadata,
+  TaskInsight,
+  WorkEvent,
+} from '../domain/types';
+import { taskDisplayName } from '../domain/processMetadata';
 
 interface Props {
   graph?: ProcessGraph;
   inferredGraph?: ProcessGraph;
   events?: WorkEvent[];
   registry?: PrimitiveRegistry;
+  processMetadata?: ProcessMetadata;
+  taskInsights: TaskInsight[];
   overrides: OverrideRecord[];
   canUndo: boolean;
+  onProcessRename: (name: string) => void;
+  onTaskRename: (nodeId: string, name: string) => void;
+  onExportMap: (format: 'JSON' | 'Markdown') => void;
   onNodeChange: (id: string, patch: Partial<GraphNode>, rationale: string) => void;
   onEdgeChange: (id: string, patch: Partial<GraphEdge>, rationale: string) => void;
   onMerge: (src: string, tgt: string, rationale: string) => void;
@@ -25,12 +40,20 @@ const ACTOR_TYPE_COLORS: Record<string, string> = {
   'service-account': 'var(--warning)',
 };
 
+function formatDuration(ms?: number): string {
+  if (!ms) return 'not observed';
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  return `${Math.round(ms / 60_000)}m`;
+}
+
 function SVGGraph({
   graph,
+  labelFor,
   onSelectNode,
   selectedNodeId,
 }: {
   graph: ProcessGraph;
+  labelFor: (node: GraphNode) => string;
   onSelectNode: (id: string) => void;
   selectedNodeId: string | null;
 }) {
@@ -38,8 +61,6 @@ function SVGGraph({
   const NODE_H = 64;
   const COL_GAP = NODE_W + 60;
   const ROW_GAP = NODE_H + 40;
-
-  // Left-to-right grid layout: nodes ordered by appearance, wrap every 5
   const posMap = new Map<string, { x: number; y: number }>();
   const MAX_PER_ROW = 5;
   const sorted = [...graph.nodes];
@@ -51,19 +72,12 @@ function SVGGraph({
 
   const totalRows = Math.ceil(sorted.length / MAX_PER_ROW);
   const colsUsed = Math.min(sorted.length, MAX_PER_ROW);
-  const svgW = colsUsed * COL_GAP + 60;
-  const svgH = totalRows * ROW_GAP + 40;
+  const svgW = Math.max(colsUsed * COL_GAP + 60, 260);
+  const svgH = Math.max(totalRows * ROW_GAP + 40, 160);
 
   return (
-    <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '400px', minWidth: '800px' }}>
-      <svg
-        width={svgW}
-        height={svgH}
-        aria-label="Process graph"
-        role="img"
-        style={{ display: 'block' }}
-      >
-        {/* Edges */}
+    <div className="process-graph-scroll">
+      <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} aria-label="Process graph" role="img">
         {graph.edges.map(edge => {
           const from = posMap.get(edge.from);
           const to = posMap.get(edge.to);
@@ -83,12 +97,12 @@ function SVGGraph({
             />
           );
         })}
-        {/* Nodes */}
         {graph.nodes.map(node => {
           const pos = posMap.get(node.id);
           if (!pos) return null;
           const isSelected = selectedNodeId === node.id;
           const actorColor = node.actorTypes[0] ? (ACTOR_TYPE_COLORS[node.actorTypes[0]] ?? 'var(--text-muted)') : 'var(--text-muted)';
+          const label = labelFor(node);
           const handleSelect = () => onSelectNode(node.id);
           return (
             <g
@@ -97,42 +111,19 @@ function SVGGraph({
               transform={`translate(${pos.x},${pos.y})`}
               role="button"
               tabIndex={0}
-              aria-label={`${node.label}, ${node.frequency} occurrences`}
+              aria-label={`${label}, ${node.frequency} occurrences`}
               onClick={handleSelect}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') handleSelect();
               }}
               onTouchEnd={handleSelect}
             >
-              <rect
-                width={NODE_W}
-                height={NODE_H}
-                rx={6}
-                fill="var(--surface-2)"
-                stroke={isSelected ? 'var(--accent)' : 'var(--border)'}
-                strokeWidth={isSelected ? 2 : 1}
-              />
-              <text
-                x={NODE_W / 2}
-                y={22}
-                fill="var(--text)"
-                fontSize={11}
-                textAnchor="middle"
-                fontFamily="var(--font-sans)"
-                style={{ pointerEvents: 'none' }}
-              >
-                {node.label.length > 18 ? node.label.slice(0, 16) + '…' : node.label}
+              <rect width={NODE_W} height={NODE_H} rx={6} fill="var(--surface-2)" stroke={isSelected ? 'var(--accent)' : 'var(--border)'} strokeWidth={isSelected ? 2 : 1} />
+              <text x={NODE_W / 2} y={22} fill="var(--text)" fontSize={11} textAnchor="middle" fontFamily="var(--font-sans)" style={{ pointerEvents: 'none' }}>
+                {label.length > 18 ? `${label.slice(0, 16)}...` : label}
               </text>
-              <text
-                x={NODE_W / 2}
-                y={38}
-                fill="var(--text-muted)"
-                fontSize={9}
-                textAnchor="middle"
-                fontFamily="var(--font-mono)"
-                style={{ pointerEvents: 'none' }}
-              >
-                ×{node.frequency}
+              <text x={NODE_W / 2} y={38} fill="var(--text-muted)" fontSize={9} textAnchor="middle" fontFamily="var(--font-mono)" style={{ pointerEvents: 'none' }}>
+                n={node.frequency}
               </text>
               <rect x={0} y={46} width={NODE_W} height={6} rx={0} fill={actorColor} opacity={0.7} />
             </g>
@@ -146,10 +137,15 @@ function SVGGraph({
 export function ProcessExplorer({
   graph,
   inferredGraph,
-  events: _events,
+  events = [],
   registry,
+  processMetadata,
+  taskInsights,
   overrides,
   canUndo,
+  onProcessRename,
+  onTaskRename,
+  onExportMap,
   onNodeChange,
   onEdgeChange,
   onMerge,
@@ -159,130 +155,150 @@ export function ProcessExplorer({
 }: Props) {
   const [tab, setTab] = useState<'graph' | 'confirm'>('graph');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [processNameDraft, setProcessNameDraft] = useState(processMetadata?.displayName ?? '');
+  const [taskNameDraft, setTaskNameDraft] = useState('');
 
   const selectedNode = graph?.nodes.find(n => n.id === selectedNodeId);
+  const selectedInsight = selectedNode ? taskInsights.find((insight) => insight.nodeId === selectedNode.id) : undefined;
+  const selectedEvents = selectedNode ? events.filter((event) => selectedNode.eventIds.includes(event.eventId)) : [];
+
+  useEffect(() => {
+    setProcessNameDraft(processMetadata?.displayName ?? '');
+  }, [processMetadata?.displayName]);
+
+  useEffect(() => {
+    if (!selectedNode) {
+      setTaskNameDraft('');
+      return;
+    }
+    setTaskNameDraft(taskDisplayName(processMetadata, selectedNode.id, selectedNode.label));
+  }, [processMetadata, selectedNode]);
+
+  const labelFor = (node: GraphNode) => taskDisplayName(processMetadata, node.id, node.label);
 
   return (
-    <div className="module-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1 }}>
+    <div className="module-content process-workspace">
       <div className="tab-bar">
-        <button
-          className={`tab-btn${tab === 'graph' ? ' active' : ''}`}
-          type="button"
-          onClick={() => setTab('graph')}
-        >
-          Graph View
+        <button className={`tab-btn${tab === 'graph' ? ' active' : ''}`} type="button" onClick={() => setTab('graph')}>
+          Process Map
         </button>
-        <button
-          className={`tab-btn${tab === 'confirm' ? ' active' : ''}`}
-          type="button"
-          onClick={() => setTab('confirm')}
-        >
-          Confirm &amp; Edit
+        <button className={`tab-btn${tab === 'confirm' ? ' active' : ''}`} type="button" onClick={() => setTab('confirm')}>
+          Gate Checks
         </button>
       </div>
 
-      <div style={{ flex: 1, padding: '1.5rem', overflow: 'auto', background: 'var(--bg)' }}>
+      <div className="process-toolbar">
+        <label>
+          Process
+          <select value={processMetadata?.id ?? 'process-main'} disabled={!processMetadata} onChange={() => undefined}>
+            <option value={processMetadata?.id ?? 'process-main'}>{processMetadata?.displayName ?? 'Selected process'}</option>
+          </select>
+        </label>
+        <label className="rename-field">
+          Rename process
+          <input value={processNameDraft} onChange={(event) => setProcessNameDraft(event.target.value)} placeholder="Process display name" />
+        </label>
+        <button className="btn" type="button" disabled={!processNameDraft.trim()} onClick={() => onProcessRename(processNameDraft)}>
+          Save name
+        </button>
+        <button className="btn ghost" type="button" onClick={() => onExportMap('Markdown')} disabled={!graph}>
+          Export map
+        </button>
+        <button className="btn ghost" type="button" onClick={() => onExportMap('JSON')} disabled={!graph}>
+          Export JSON
+        </button>
+      </div>
+
+      <div className="process-workspace-body">
         {tab === 'graph' && (
           <>
-            <div style={{ marginBottom: '1rem' }}>
-              <h2 style={{ color: 'var(--text)', margin: '0 0 0.3rem', fontSize: '1.4rem' }}>
-                Process Graph
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: 0 }}>
-                {graph ? `${graph.nodes.length} nodes · ${graph.edges.length} edges · click node to inspect` : 'No process data. Import events to build the graph.'}
+            <div className="module-heading compact">
+              <h2>Process Map</h2>
+              <p>
+                {graph ? `${graph.nodes.length} tasks, ${graph.edges.length} transitions, ${Math.round((processMetadata?.confidence ?? 0) * 100)}% minimum confidence.` : 'Import events or a BPMN file to build the map.'}
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1, minWidth: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1rem' }}>
+            {graph && graph.nodes.length > 0 && (
+              <div className="map-proof-strip" role="status">
+                <strong>Edits Enabled</strong>
+                <span>Task labels can be renamed here; original source labels remain in provenance and exports.</span>
+              </div>
+            )}
+
+            <div className="process-map-layout">
+              <div className="process-map-card">
                 {graph && graph.nodes.length > 0 ? (
-                  <SVGGraph
-                    graph={graph}
-                    onSelectNode={setSelectedNodeId}
-                    selectedNodeId={selectedNodeId}
-                  />
+                  <SVGGraph graph={graph} labelFor={labelFor} onSelectNode={setSelectedNodeId} selectedNodeId={selectedNodeId} />
                 ) : (
-                  <div className="empty-state">
-                    <p>No process data available. Import events first.</p>
-                  </div>
+                  <div className="empty-state"><p>No process data available. Import events first.</p></div>
                 )}
-                {/* Legend */}
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                <div className="actor-legend">
                   {Object.entries(ACTOR_TYPE_COLORS).map(([k, c]) => (
-                    <span key={k} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 2, background: c, display: 'inline-block' }} />
-                      {k}
-                    </span>
+                    <span key={k}><i style={{ background: c }} />{k}</span>
                   ))}
                 </div>
               </div>
 
-              {/* Node detail panel */}
               {selectedNode && (
-                <div style={{
-                  width: '280px',
-                  flexShrink: 0,
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '1rem',
-                  fontSize: '0.82rem',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <strong style={{ color: 'var(--text)', fontSize: '0.9rem' }}>{selectedNode.label}</strong>
-                    <button
-                      className="btn ghost"
-                      style={{ padding: '0.1rem 0.4rem', fontSize: '0.75rem' }}
-                      type="button"
-                      onClick={() => setSelectedNodeId(null)}
-                      aria-label="Close node detail"
-                    >
-                      ✕
-                    </button>
+                <aside className="node-detail-panel">
+                  <div className="detail-header">
+                    <div>
+                      <span className="eyebrow">Task details</span>
+                      <strong>{labelFor(selectedNode)}</strong>
+                    </div>
+                    <button className="btn ghost" type="button" onClick={() => setSelectedNodeId(null)} aria-label="Close node detail">x</button>
                   </div>
-                  <dl style={{ display: 'grid', gap: '0.4rem', margin: 0 }}>
-                    {[
-                      ['Type', selectedNode.activityType],
-                      ['Frequency', String(selectedNode.frequency)],
-                      ['Avg Duration', selectedNode.totalDurationMs && selectedNode.frequency
-                        ? `${Math.round(selectedNode.totalDurationMs / selectedNode.frequency / 1000)}s`
-                        : '—'],
-                      ['Actors', selectedNode.actorIds.join(', ') || '—'],
-                      ['Truth', selectedNode.truthState],
-                      ['Status', selectedNode.status],
-                    ].map(([label, val]) => (
-                      <div key={label} style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.3rem' }}>
-                        <dt style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>{label}</dt>
-                        <dd style={{ margin: 0, color: 'var(--text)', wordBreak: 'break-all' }}>{val}</dd>
-                      </div>
-                    ))}
+
+                  <label className="detail-rename">
+                    Rename task
+                    <div>
+                      <input value={taskNameDraft} onChange={(event) => setTaskNameDraft(event.target.value)} />
+                      <button className="btn" type="button" onClick={() => onTaskRename(selectedNode.id, taskNameDraft)}>Save</button>
+                    </div>
+                  </label>
+
+                  <dl className="insight-grid">
+                    <div><dt>Original label</dt><dd>{processMetadata?.originalTaskLabels[selectedNode.id] ?? selectedNode.label}</dd></div>
+                    <div><dt>Events</dt><dd>{selectedInsight?.eventCount ?? selectedNode.frequency}</dd></div>
+                    <div><dt>Cases</dt><dd>{selectedInsight?.caseCount ?? '-'}</dd></div>
+                    <div><dt>Median duration</dt><dd>{formatDuration(selectedInsight?.medianDurationMs)}</dd></div>
+                    <div><dt>Exceptions</dt><dd>{selectedInsight?.exceptionCount ?? selectedNode.exceptions}</dd></div>
+                    <div><dt>Retries</dt><dd>{selectedInsight?.retryCount ?? selectedNode.repeats}</dd></div>
+                    <div><dt>Actors</dt><dd>{selectedInsight?.actorMix.join(', ') || selectedNode.actorIds.join(', ') || '-'}</dd></div>
+                    <div><dt>Paths</dt><dd>{selectedInsight ? `${selectedInsight.upstream.length} upstream / ${selectedInsight.downstream.length} downstream` : '-'}</dd></div>
                   </dl>
+
+                  {selectedInsight && selectedInsight.insufficientTelemetry.length > 0 && (
+                    <div className="insufficient-telemetry">
+                      <strong>Insufficient telemetry</strong>
+                      <ul>{selectedInsight.insufficientTelemetry.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </div>
+                  )}
+
                   {selectedNode.eventIds.length > 0 && (
-                    <div style={{ marginTop: '0.75rem' }}>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', margin: '0 0 0.4rem' }}>
-                        Source events ({selectedNode.eventIds.length}):
-                      </p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                    <div className="evidence-block">
+                      <span>Source events ({selectedNode.eventIds.length})</span>
+                      <div className="event-chip-row">
                         {selectedNode.eventIds.slice(0, 5).map(eid => (
-                          <button
-                            key={eid}
-                            className="btn ghost"
-                            style={{ padding: '0.1rem 0.35rem', fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--info)' }}
-                            type="button"
-                            onClick={() => onOpenEvent(eid)}
-                          >
-                            {eid.slice(0, 12)}…
-                          </button>
+                          <button key={eid} className="btn ghost" type="button" onClick={() => onOpenEvent(eid)}>{eid.slice(0, 12)}...</button>
                         ))}
-                        {selectedNode.eventIds.length > 5 && (
-                          <span style={{ color: 'var(--text-dim)', fontSize: '0.68rem', alignSelf: 'center' }}>
-                            +{selectedNode.eventIds.length - 5} more
-                          </span>
-                        )}
                       </div>
                     </div>
                   )}
-                </div>
+
+                  {selectedEvents.length > 0 && (
+                    <div className="selected-event-summary">
+                      <p>Evidence preview</p>
+                      {selectedEvents.slice(0, 3).map((event) => (
+                        <button key={event.eventId} type="button" onClick={() => onOpenEvent(event.eventId)}>
+                          <strong>{event.activity.label}</strong>
+                          <span>{event.actor.type} - {event.result.status} - {event.caseId}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </aside>
               )}
             </div>
           </>
@@ -304,9 +320,7 @@ export function ProcessExplorer({
         )}
 
         {tab === 'confirm' && (!graph || !inferredGraph || !registry) && (
-          <div className="empty-state">
-            <p>Import process data first to confirm and edit.</p>
-          </div>
+          <div className="empty-state"><p>Import process data first to confirm and edit.</p></div>
         )}
       </div>
     </div>

@@ -6,9 +6,15 @@ import {
   createJsonExport,
   exportMarkdown,
   exportMermaid,
+  exportProcessMapJson,
+  exportProcessMapMarkdown,
   validateFlowExport,
 } from "../src/domain/exports";
 import { detectGaps } from "../src/domain/gaps";
+import { importBpmnAsEvents } from "../src/domain/bpmnImport";
+import { buildTaskInsights } from "../src/domain/processInsights";
+import { createDefaultProcessMetadata } from "../src/domain/processMetadata";
+import { buildProcessRisks } from "../src/domain/processRisks";
 import { recommendTreatments } from "../src/domain/recommendations";
 import {
   validatePrimitiveRegistry,
@@ -46,6 +52,32 @@ describe("schema boundaries", () => {
     expect(eventResult.issues).toEqual([]);
     expect(registryResult.valid).toBe(true);
     expect(registryResult.acceptedCount).toBe(5);
+  });
+
+  it("rejects water and energy resource telemetry from the FlowSensa schema", () => {
+    const withExcludedResources = structuredClone(sampleFixture) as WorkEventCollection;
+    withExcludedResources.events[0]!.resources = [
+      {
+        kind: "water" as never,
+        value: 1,
+        unit: "liter",
+        measurementClass: "estimated",
+        allocationMethod: "excluded",
+        sourceRef: "test://water",
+      },
+      {
+        kind: "electricity" as never,
+        value: 1,
+        unit: "kWh",
+        measurementClass: "estimated",
+        allocationMethod: "excluded",
+        sourceRef: "test://electricity",
+      },
+    ];
+
+    const result = validateWorkEvents(withExcludedResources);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some((issue) => issue.field.includes("resources/0/kind"))).toBe(true);
   });
 
   it("validates the richer fictional showcase dataset", () => {
@@ -166,6 +198,44 @@ describe("versioned exports", () => {
 });
 
 // ── Closed-loop recommendation tests (FR-026) ──────────────────────────
+
+describe("operational context workspace", () => {
+  it("imports BPMN as an unconfirmed candidate event collection", () => {
+    const collection = importBpmnAsEvents(
+      `<?xml version="1.0" encoding="UTF-8"?>
+      <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+        <process id="p1">
+          <task id="research" name="Research topic" />
+          <userTask id="draft" name="Draft post" />
+        </process>
+      </definitions>`,
+      "sample.bpmn",
+    );
+
+    expect(collection.events).toHaveLength(2);
+    expect(collection.events[0]!.tags).toContain("bpmn-import");
+    expect(collection.events[0]!.truthState).toBe("inferred");
+  });
+
+  it("builds task insights, deterministic risks, and provenance-safe map exports", () => {
+    const graph = discoverProcess(validCollection);
+    const recommendations = recommendTreatments(graph.nodes, validCollection.events);
+    const metadata = createDefaultProcessMetadata(graph, validCollection, "Renamed process");
+    metadata.taskDisplayNames[graph.nodes[0]!.id] = "Renamed task";
+
+    const insights = buildTaskInsights(graph, validCollection.events);
+    const risks = buildProcessRisks(metadata, insights, recommendations);
+    const json = exportProcessMapJson(graph, metadata, insights);
+    const markdown = exportProcessMapMarkdown(graph, metadata, insights);
+
+    expect(insights[0]!.eventCount).toBeGreaterThan(0);
+    expect(risks.length).toBeGreaterThan(0);
+    expect(json).toContain("Renamed process");
+    expect(json).toContain("Renamed task");
+    expect(json).toContain("originalLabel");
+    expect(markdown).toContain("| Display name | Original label |");
+  });
+});
 
 describe("closed-loop recommendations", () => {
   const baseEvent = (overrides: Record<string, unknown>) => ({

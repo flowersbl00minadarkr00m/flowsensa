@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { Gap, GraphNode, Recommendation, RecommendationClass } from '../domain/types';
 import { EvidenceLinks } from '../components/EvidenceLinks';
 import { RECOMMENDATION_CLASSES } from '../components/EngineerView';
+import type { Gap, GraphNode, Recommendation, RecommendationClass } from '../domain/types';
 
 interface Props {
   nodes: GraphNode[];
@@ -18,15 +18,12 @@ function familyFor(cls: RecommendationClass): Family {
   if (
     cls === 'Probabilistic AI assistance with human execution' ||
     cls === 'Probabilistic AI proposal with human approval'
-  )
-    return 'LLM';
+  ) return 'LLM';
   if (
     cls === 'Bounded probabilistic execution with deterministic controls' ||
     cls === 'Hybrid deterministic/probabilistic workflow'
-  )
-    return 'Hybrid';
-  if (cls === 'Keep manual' || cls === 'Simplify or eliminate before automating')
-    return 'Keep Manual';
+  ) return 'Hybrid';
+  if (cls === 'Keep manual' || cls === 'Simplify or eliminate before automating') return 'Keep Manual';
   return 'Insufficient evidence';
 }
 
@@ -38,23 +35,22 @@ const FAMILY_BADGE_CLASS: Record<Family, string> = {
   'Insufficient evidence': 'badge family-insufficient',
 };
 
-/** Plain-language meaning of each recommended treatment family. */
 const FAMILY_MEANING: Record<Family, { headline: string; what: string }> = {
   Automation: {
-    headline: 'Automate this step',
-    what: 'It runs consistently with predictable inputs and outputs, so deterministic rules or code can take it over.',
+    headline: 'Automate',
+    what: 'Use deterministic rules or code when the observed inputs, outputs, and checks are stable enough to verify exactly.',
   },
   LLM: {
-    headline: 'Add AI assistance',
-    what: 'An AI model can draft or propose the output, but a person still reviews or approves before it counts.',
+    headline: 'AI assist',
+    what: 'Use a model to draft, summarize, compare, or propose, while a person still owns review and acceptance.',
   },
   Hybrid: {
-    headline: 'Automate with guardrails',
-    what: 'Combine automated execution with deterministic checks that catch and contain errors.',
+    headline: 'Guarded hybrid',
+    what: 'Combine AI capability with deterministic permissions, validation, evidence retention, and stop conditions.',
   },
   'Keep Manual': {
-    headline: 'Keep this step human',
-    what: 'The evidence does not support automating it yet — keep it manual, or simplify it before automating.',
+    headline: 'Simplify or keep human-owned',
+    what: 'Keep judgment with a person, or simplify the work before trying to automate it.',
   },
   'Insufficient evidence': {
     headline: 'Needs more evidence',
@@ -63,45 +59,91 @@ const FAMILY_MEANING: Record<Family, { headline: string; what: string }> = {
 };
 
 function generateBrief(family: Family, rec: Recommendation): string {
-  const header = `# Improvement Brief — ${rec.nodeId}\nFamily: ${family}\nConfidence: ${Math.round(rec.confidence * 100)}%\n\n`;
+  const controls = rec.requiredControls.map((control) => `- ${control}`).join('\n') || '- Evidence review';
+  const failures = rec.expectedFailureModes.map((failure) => `- ${failure}`).join('\n') || '- Unknown failure mode';
+  const header = `# Improvement Brief - ${rec.nodeId}
+Family: ${family}
+Confidence: ${Math.round(rec.confidence * 100)}%
+
+`;
+
   if (family === 'Automation') {
-    return header + `## Deterministic Automation Proposal\nThis step is a candidate for full deterministic automation.\n\n### Trigger\n[Define trigger condition]\n\n### Logic\n[Specify deterministic rules / code]\n\n### Controls\n${rec.requiredControls.join('\n- ')}\n\n### Expected Failure Modes\n${rec.expectedFailureModes.join('\n- ')}\n`;
+    return `${header}## Deterministic Automation Proposal
+This step is a candidate for exact, testable automation.
+
+### Trigger
+[Define trigger condition]
+
+### Logic
+[Specify deterministic rules or code]
+
+### Controls
+${controls}
+
+### Expected Failure Modes
+${failures}
+`;
   }
+
   if (family === 'LLM') {
-    return header + `## LLM-Assisted Proposal\nAn LLM can augment or propose outputs for this step.\n\n### Advisory Notice\nAll LLM outputs are advisory until human-approved.\n\n### Prompt Template\n[Define structured prompt]\n\n### Human Review Gate\n[Define approval criteria]\n\n### Controls\n${rec.requiredControls.join('\n- ')}\n`;
+    return `${header}## LLM-Assisted Proposal
+An LLM can propose or draft output for this step, but the output stays advisory until human-approved.
+
+### Prompt Template
+[Define structured prompt]
+
+### Human Review Gate
+[Define acceptance criteria]
+
+### Controls
+${controls}
+`;
   }
+
   if (family === 'Hybrid') {
-    return header + `## Hybrid Automation Proposal\nCombine deterministic controls with probabilistic capabilities.\n\n### Deterministic Layer\n[Specify rules]\n\n### Probabilistic Layer\n[Specify AI component]\n\n### Controls\n${rec.requiredControls.join('\n- ')}\n`;
+    return `${header}## Guarded Hybrid Proposal
+Combine probabilistic capability with deterministic permissions, checks, and stop conditions.
+
+### Deterministic Layer
+[Specify permissions, validators, and rollback or stop logic]
+
+### Model Layer
+[Specify bounded model role]
+
+### Controls
+${controls}
+
+### Expected Failure Modes
+${failures}
+`;
   }
-  return header + `## Keep Manual / Simplify\nThis step should remain manual or be simplified before automation is considered.\n\n### Rationale\n${rec.uncertainty}\n\n### Simplification Opportunities\n[Identify waste and non-value steps]\n`;
+
+  return `${header}## Simplify / Keep Human-Owned
+This step should remain manual or be simplified before automation is considered.
+
+### Rationale
+${rec.uncertainty}
+
+### Simplification Opportunities
+[Identify waste, unclear ownership, or missing controls]
+`;
 }
 
 function MnemosyncModal({ rec, onClose }: { rec: Recommendation; onClose: () => void }) {
-  const text = `flowsensa-improvement\nnode: ${rec.nodeId}\nrecommendation: ${rec.recommendationClass}\nconfidence: ${Math.round(rec.confidence * 100)}%\nevidence: ${rec.evidenceEventIds.slice(0, 3).join(', ')}\n`;
+  const text = `flowsensa-improvement
+node: ${rec.nodeId}
+recommendation: ${rec.recommendationClass}
+confidence: ${Math.round(rec.confidence * 100)}%
+evidence: ${rec.evidenceEventIds.slice(0, 3).join(', ')}
+`;
+
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
-          padding: '1.5rem', maxWidth: '500px', width: '90%',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <h3 style={{ color: 'var(--text)', marginTop: 0 }}>Track in Mnemosync</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Copy and paste into your Mnemosync workspace:</p>
-        <pre style={{
-          background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-          padding: '0.75rem', fontSize: '0.78rem', color: 'var(--text)', whiteSpace: 'pre-wrap', marginBottom: '1rem',
-        }}>
-          {text}
-        </pre>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+        <h3>Track in Mnemosync</h3>
+        <p>Copy this explicit handoff into your Mnemosync workspace. Flowsensa will not write to another product silently.</p>
+        <pre>{text}</pre>
+        <div className="button-row">
           <button className="btn primary" type="button" onClick={() => { void navigator.clipboard.writeText(text); }}>
             Copy
           </button>
@@ -122,10 +164,12 @@ export function ImprovementOpportunities({
   const [familyFilter, setFamilyFilter] = useState<Family | ''>('');
   const [minConfidence, setMinConfidence] = useState(0);
   const [mnemosyncRec, setMnemosyncRec] = useState<Recommendation | null>(null);
+  const confirmedNodes = nodes.filter((node) => node.status === 'confirmed').length;
+  const recommendationsAreProvisional = confirmedNodes === 0;
 
-  const filtered = recommendations.filter(rec => {
-    const f = familyFor(rec.recommendationClass);
-    if (familyFilter && f !== familyFilter) return false;
+  const filtered = recommendations.filter((rec) => {
+    const family = familyFor(rec.recommendationClass);
+    if (familyFilter && family !== familyFilter) return false;
     if (rec.confidence < minConfidence / 100) return false;
     return true;
   });
@@ -135,21 +179,27 @@ export function ImprovementOpportunities({
   return (
     <div className="module-content">
       <div className="module-heading">
-        <h2>Improvement Opportunities</h2>
+        <h2>Process Enhancements</h2>
         <p>
-          For every step FlowSensa observed in your process, it recommends how to
-          improve it — automate it, add AI assistance, use a guarded hybrid, or
-          keep it manual — and shows the evidence behind that call. Each card is a
-          recommendation you can accept or override.
+          Choose the right enhancement for each observed step: automate, AI assist,
+          guarded hybrid, simplify, or keep human-owned. Every suggestion stays tied
+          to source events so the recommendation can be challenged.
         </p>
       </div>
 
+      {recommendationsAreProvisional && (
+        <div className="provisional-banner" role="status">
+          <strong>Provisional recommendations</strong>
+          <span>No process steps are confirmed yet. Use Process Map and Gate Checks before treating these suggestions as implementation-ready.</span>
+        </div>
+      )}
+
       <div className="filter-bar">
         <label>
-          Family
-          <select value={familyFilter} onChange={e => setFamilyFilter(e.target.value as Family | '')}>
+          Enhancement
+          <select value={familyFilter} onChange={(event) => setFamilyFilter(event.target.value as Family | '')}>
             <option value="">All</option>
-            {families.map(f => <option key={f} value={f}>{f}</option>)}
+            {families.map((family) => <option key={family} value={family}>{family}</option>)}
           </select>
         </label>
         <label style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
@@ -159,7 +209,7 @@ export function ImprovementOpportunities({
             min={0}
             max={100}
             value={minConfidence}
-            onChange={e => setMinConfidence(Number(e.target.value))}
+            onChange={(event) => setMinConfidence(Number(event.target.value))}
             style={{ width: '120px' }}
           />
         </label>
@@ -173,127 +223,106 @@ export function ImprovementOpportunities({
           <p>No recommendations match the current filter. Import process events to generate recommendations.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: '1rem' }}>
-          {filtered.map(rec => {
-            const node = nodes.find(n => n.id === rec.nodeId);
+        <div className="opportunity-grid">
+          {filtered.map((rec) => {
+            const node = nodes.find((candidate) => candidate.id === rec.nodeId);
             const family = familyFor(rec.recommendationClass);
             return (
-              <div key={rec.nodeId} className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              <div key={rec.nodeId} className="card opportunity-card">
+                <div className="opportunity-header">
                   <div>
-                    <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
-                      {node?.activityType ?? 'activity'} step
-                    </span>
-                    <h3 style={{ color: 'var(--text)', margin: '0.1rem 0 0', fontSize: '1rem' }}>
-                      {node?.label ?? rec.nodeId}
-                    </h3>
+                    <span className="opportunity-type">{node?.activityType ?? 'activity'} step</span>
+                    <h3>{node?.label ?? rec.nodeId}</h3>
                   </div>
                   <span className={FAMILY_BADGE_CLASS[family]}>{family}</span>
                 </div>
 
-                {/* Plain-language recommendation */}
                 <div className="rec-summary">
                   <p className="rec-headline">
-                    <span className="rec-label">Recommendation</span>
+                    <span className="rec-label">Enhancement</span>
                     {FAMILY_MEANING[family].headline}
                   </p>
                   <p className="rec-what">{FAMILY_MEANING[family].what}</p>
                   {rec.uncertainty && (
-                    <p className="rec-why"><strong>Why:</strong> {rec.uncertainty}</p>
+                    <p className="rec-why"><strong>Evidence note:</strong> {rec.uncertainty}</p>
                   )}
                 </div>
 
-                {/* Confidence bar */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.75rem 0' }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: '110px' }}>
-                    {Math.round(rec.confidence * 100)}% confidence
-                  </span>
+                <div className="confidence-row-compact">
+                  <span>{Math.round(rec.confidence * 100)}% confidence</span>
                   <div className="confidence-bar-wrap">
                     <div className="confidence-bar-fill" style={{ width: `${rec.confidence * 100}%` }} />
                   </div>
                 </div>
 
-                {/* Failure modes + controls, if present */}
                 {(rec.expectedFailureModes.length > 0 || rec.requiredControls.length > 0) && (
                   <details className="rec-details">
-                    <summary>What to watch for before you change this</summary>
+                    <summary>Controls and failure modes</summary>
                     <div className="rec-details-grid">
                       {rec.expectedFailureModes.length > 0 && (
                         <div>
-                          <h4>Expected failure modes</h4>
-                          <ul>{rec.expectedFailureModes.map(f => <li key={f}>{f}</li>)}</ul>
+                          <h4>Failure modes</h4>
+                          <ul>{rec.expectedFailureModes.map((failure) => <li key={failure}>{failure}</li>)}</ul>
                         </div>
                       )}
                       {rec.requiredControls.length > 0 && (
                         <div>
                           <h4>Required controls</h4>
-                          <ul>{rec.requiredControls.map(c => <li key={c}>{c}</li>)}</ul>
+                          <ul>{rec.requiredControls.map((control) => <li key={control}>{control}</li>)}</ul>
                         </div>
                       )}
                     </div>
                   </details>
                 )}
 
-                {/* Treatment selector */}
-                <label style={{ display: 'grid', gap: '0.3rem', marginBottom: '0.75rem' }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-                    Recommended treatment — change it if you disagree
-                  </span>
+                <label className="intervention-select">
+                  <span>Enhancement choice - change it if the evidence says otherwise</span>
                   <select
                     value={rec.recommendationClass}
-                    onChange={e => onRecommendationChange(rec.nodeId, e.target.value as RecommendationClass)}
-                    style={{
-                      background: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text)',
-                      borderRadius: 'var(--radius)',
-                      padding: '0.4rem 0.6rem',
-                      fontSize: '0.8rem',
-                      fontFamily: 'var(--font-sans)',
-                    }}
+                    onChange={(event) => onRecommendationChange(rec.nodeId, event.target.value as RecommendationClass)}
                   >
-                    {RECOMMENDATION_CLASSES.map(cls => (
+                    {RECOMMENDATION_CLASSES.map((cls) => (
                       <option key={cls} value={cls}>{cls}</option>
                     ))}
                   </select>
                 </label>
 
-                {/* Evidence links */}
                 {rec.evidenceEventIds.length > 0 && (
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>
-                      Evidence events ({rec.evidenceEventIds.length}):
-                    </span>
+                  <div className="evidence-block">
+                    <span>Evidence events ({rec.evidenceEventIds.length})</span>
                     <EvidenceLinks eventIds={rec.evidenceEventIds} onOpenEvent={onOpenEvent} />
                   </div>
                 )}
 
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div className="button-row">
                   <button
                     className="btn"
                     type="button"
-                    style={{ fontSize: '0.75rem' }}
                     onClick={() => {
                       const content = generateBrief(family, rec);
                       const blob = new Blob([content], { type: 'text/plain' });
                       const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `flowsensa-brief-${rec.nodeId}.md`;
-                      a.click();
+                      const anchor = document.createElement('a');
+                      anchor.href = url;
+                      anchor.download = `flowsensa-brief-${rec.nodeId}.md`;
+                      anchor.click();
                       URL.revokeObjectURL(url);
                     }}
                   >
                     Generate brief
                   </button>
+                  <button className="btn ghost" type="button" onClick={() => setMnemosyncRec(rec)}>
+                    Track in Mnemosync
+                  </button>
                   <button
                     className="btn ghost"
                     type="button"
-                    style={{ fontSize: '0.75rem' }}
-                    onClick={() => setMnemosyncRec(rec)}
+                    onClick={() => {
+                      const query = `OSSensa alternatives for ${family.toLowerCase()} process tooling on ${node?.label ?? rec.nodeId}`;
+                      void navigator.clipboard.writeText(query);
+                    }}
                   >
-                    Track in Mnemosync
+                    Copy OSSensa search
                   </button>
                 </div>
               </div>
@@ -302,31 +331,18 @@ export function ImprovementOpportunities({
         </div>
       )}
 
-      {/* Gaps */}
       {gaps.length > 0 && (
         <div className="card" style={{ marginTop: '1.5rem' }}>
           <div className="card-header" style={{ marginBottom: '0.75rem' }}>
-            <h3>Responsibility & Control Gaps</h3>
+            <h3>Responsibility and control gaps</h3>
             <span className="badge">{gaps.length}</span>
           </div>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.6rem' }}>
-            {gaps.map(gap => (
-              <li
-                key={gap.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto',
-                  gap: '0.75rem',
-                  alignItems: 'center',
-                  borderLeft: `3px solid ${gap.severity === 'critical' ? 'var(--danger)' : gap.severity === 'warning' ? 'var(--warning)' : 'var(--info)'}`,
-                  background: 'var(--surface-2)',
-                  padding: '0.7rem 1rem',
-                  borderRadius: `0 var(--radius) var(--radius) 0`,
-                }}
-              >
+          <ul className="gap-list">
+            {gaps.map((gap) => (
+              <li key={gap.id} className={`gap gap-${gap.severity}`}>
                 <div>
-                  <strong style={{ color: 'var(--text)', display: 'block' }}>{gap.type}</strong>
-                  <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.78rem' }}>{gap.message}</p>
+                  <strong>{gap.type}</strong>
+                  <p>{gap.message}</p>
                 </div>
                 <EvidenceLinks eventIds={gap.eventIds} onOpenEvent={onOpenEvent} />
               </li>

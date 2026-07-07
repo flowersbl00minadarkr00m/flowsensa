@@ -33,27 +33,22 @@ export function ImportPanel({
           </h1>
           <p className="lede">
             Turn human, agent, and system events into an evidence-backed process
-            you can inspect, correct, and improve.
+            you can inspect, correct, and improve without giving up local control.
           </p>
         </div>
+
         <div className="button-row">
-          <button className="primary" type="button" onClick={onSync} disabled={syncing}>
-            {syncing ? "Syncing…" : "Sync with Mnemosync"} <span aria-hidden="true">↗</span>
+          <button className="primary" type="button" onClick={onDemo}>Begin demo</button>
+          <button type="button" onClick={() => inputRef.current?.click()}>Import process</button>
+          <button type="button" onClick={onSync} disabled={syncing}>
+            {syncing ? "Syncing..." : "Sync with Mnemosync"}
           </button>
-          <button type="button" onClick={onDemo}>
-            Explore sample workspace
-          </button>
-          <button type="button" onClick={() => inputRef.current?.click()}>
-            Import JSON
-          </button>
-          <button className="text-button" type="button" onClick={onInvalidDemo}>
-            Test error handling
-          </button>
+          <button className="text-button" type="button" onClick={onInvalidDemo}>Test error handling</button>
           <input
             ref={inputRef}
             className="visually-hidden"
             type="file"
-            accept="application/json,.json"
+            accept="application/json,.json,.bpmn,.xml,image/*"
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) onFile(file);
@@ -61,17 +56,16 @@ export function ImportPanel({
             }}
           />
         </div>
+
         <div className="privacy-callout">
-          <span className="privacy-icon" aria-hidden="true">⌁</span>
+          <span className="privacy-icon" aria-hidden="true">~</span>
           <div>
             <strong>Private by default</strong>
-            <span>
-              Your operational data stays in this browser. No external model,
-              no silent sharing.
-            </span>
+            <span>Your operational data stays in this browser. No external model, no silent sharing.</span>
           </div>
         </div>
       </div>
+
       <div className="landing-visual" aria-hidden="true">
         <div className="orbit orbit-one" />
         <div className="orbit orbit-two" />
@@ -91,7 +85,7 @@ export function ImportPanel({
               <span>Live</span>
             </div>
             <div className="visual-metrics">
-              <div><small>Cases</small><strong>02</strong><i>+100%</i></div>
+              <div><small>Cases</small><strong>02</strong><i>active</i></div>
               <div><small>Variants</small><strong>02</strong><i>observed</i></div>
               <div><small>Handoffs</small><strong>08</strong><i>review</i></div>
             </div>
@@ -116,32 +110,27 @@ export function ImportPanel({
               </svg>
             </div>
             <div className="visual-process">
-              <span>Receive</span><b>→</b><span>Extract</span><b>→</b>
-              <span className="active">Validate</span><b>→</b><span>Approve</span>
+              <span>Research</span><b>-&gt;</b><span>Draft</span><b>-&gt;</b>
+              <span className="active">Review</span><b>-&gt;</b><span>Ship</span>
             </div>
           </div>
         </div>
         <div className="floating-card floating-card-one">
-          <span>✓</span>
-          <div><strong>Evidence linked</strong><small>10 source events</small></div>
+          <span>OK</span>
+          <div><strong>Evidence linked</strong><small>source events</small></div>
         </div>
         <div className="floating-card floating-card-two">
           <strong>50%</strong>
-          <small>accepted outcome rate</small>
+          <small>confirmed work map</small>
         </div>
       </div>
-      {importSummary ? (
-        <p className="status-message" role="status">
-          {importSummary}
-        </p>
-      ) : null}
+
+      {importSummary ? <p className="status-message" role="status">{importSummary}</p> : null}
+
       {issues.length > 0 ? (
         <div className="error-panel" role="alert">
-          <h2>Import blocked · {issues.length} schema issues</h2>
-          <p>
-            The canonical store was not changed. Fix every event and field shown
-            below, then import again.
-          </p>
+          <h2>Import blocked - {issues.length} schema issues</h2>
+          <p>The canonical store was not changed. Fix every event and field shown below, then import again.</p>
           <div className="table-scroll">
             <table>
               <thead>

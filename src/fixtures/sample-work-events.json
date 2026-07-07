@@ -119,23 +119,6 @@
           "unit": "USD",
           "measurementClass": "provider-reported",
           "sourceRef": "fixture/model-usage/evt-1001-02"
-        },
-        {
-          "kind": "electricity",
-          "value": 0.0008,
-          "unit": "kWh",
-          "measurementClass": "estimated",
-          "sourceRef": "fixture/resource-estimate/evt-1001-02",
-          "allocationMethod": "Synthetic fixture estimate; not a measured workload value.",
-          "confidence": 0.25
-        },
-        {
-          "kind": "water",
-          "value": null,
-          "unit": "L",
-          "measurementClass": "unknown",
-          "sourceRef": "fixture/resource-unknown/evt-1001-02",
-          "notes": "Included to verify unknown values remain visible and are not treated as measured."
         }
       ],
       "acceptedOutcome": false,

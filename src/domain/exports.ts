@@ -2,8 +2,11 @@ import type {
   FlowExport,
   PrimitiveRegistry,
   ProcessGraph,
+  ProcessMetadata,
   Recommendation,
+  TaskInsight,
 } from "./types";
+import { taskDisplayName } from "./processMetadata";
 
 export function createJsonExport(input: Omit<FlowExport, "schemaVersion" | "exportType" | "exportedAt">): FlowExport {
   return {
@@ -81,6 +84,92 @@ export function exportMarkdown(
     "",
     "```mermaid",
     exportMermaid(graph),
+    "```",
+  ];
+  return lines.join("\n");
+}
+
+export function exportProcessMapJson(
+  graph: ProcessGraph,
+  metadata: ProcessMetadata,
+  insights: TaskInsight[],
+): string {
+  return JSON.stringify({
+    schemaVersion: "1.0.0",
+    exportType: "flowsensa-process-map",
+    exportedAt: new Date().toISOString(),
+    process: metadata,
+    tasks: graph.nodes
+      .filter((node) => node.status !== "rejected")
+      .map((node) => ({
+        id: node.id,
+        displayName: taskDisplayName(metadata, node.id, node.label),
+        originalLabel: metadata.originalTaskLabels[node.id] ?? node.label,
+        status: node.status,
+        truthState: node.truthState,
+        frequency: node.frequency,
+        confidence: node.confidence,
+        insight: insights.find((insight) => insight.nodeId === node.id),
+      })),
+    transitions: graph.edges
+      .filter((edge) => edge.status !== "rejected")
+      .map((edge) => ({
+        id: edge.id,
+        from: edge.from,
+        to: edge.to,
+        frequency: edge.frequency,
+        handoffs: edge.handoffs,
+        truthState: edge.truthState,
+        status: edge.status,
+      })),
+  }, null, 2);
+}
+
+export function exportProcessMapMarkdown(
+  graph: ProcessGraph,
+  metadata: ProcessMetadata,
+  insights: TaskInsight[],
+): string {
+  const lines = [
+    `# ${metadata.displayName}`,
+    "",
+    `Generated: ${new Date().toISOString()}`,
+    `Source: ${metadata.source}`,
+    `Minimum confidence: ${Math.round(metadata.confidence * 100)}%`,
+    "",
+    "## Tasks",
+    "",
+    "| Display name | Original label | Events | Cases | Exceptions | Retries | Evidence note |",
+    "| --- | --- | ---: | ---: | ---: | ---: | --- |",
+    ...graph.nodes
+      .filter((node) => node.status !== "rejected")
+      .map((node) => {
+        const insight = insights.find((candidate) => candidate.nodeId === node.id);
+        return `| ${taskDisplayName(metadata, node.id, node.label)} | ${metadata.originalTaskLabels[node.id] ?? node.label} | ${insight?.eventCount ?? node.frequency} | ${insight?.caseCount ?? 0} | ${insight?.exceptionCount ?? node.exceptions} | ${insight?.retryCount ?? node.repeats} | ${(insight?.insufficientTelemetry ?? []).join("; ") || "Telemetry available"} |`;
+      }),
+    "",
+    "## Transitions",
+    "",
+    "| From | To | Frequency | Handoffs |",
+    "| --- | --- | ---: | ---: |",
+    ...graph.edges
+      .filter((edge) => edge.status !== "rejected")
+      .map((edge) => {
+        const from = graph.nodes.find((node) => node.id === edge.from);
+        const to = graph.nodes.find((node) => node.id === edge.to);
+        return `| ${from ? taskDisplayName(metadata, from.id, from.label) : edge.from} | ${to ? taskDisplayName(metadata, to.id, to.label) : edge.to} | ${edge.frequency} | ${edge.handoffs} |`;
+      }),
+    "",
+    "## Mermaid",
+    "",
+    "```mermaid",
+    exportMermaid({
+      ...graph,
+      nodes: graph.nodes.map((node) => ({
+        ...node,
+        label: taskDisplayName(metadata, node.id, node.label),
+      })),
+    }),
     "```",
   ];
   return lines.join("\n");

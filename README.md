@@ -1,8 +1,8 @@
-# Flowsensa
+# FlowSensa
 
-Enterprise process-intelligence application. Discover, confirm, and engineer your operational workflows from observed event data.
+Local-first process intelligence for human, agent, and system work. FlowSensa turns telemetry logs into process maps, task insights, process risks, enhancement suggestions, and exportable evidence.
 
-## Getting started
+## Getting Started
 
 ```bash
 npm install
@@ -11,21 +11,54 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173).
 
-## Demo mode
+## Demo Mode
 
-Click **Load demo** or **Run demo activity** on the Data Sources page. No API key required. The Northstar showcase is a fictional organisation — no real data.
+Click **Begin demo** to load the synthetic creator/project workspace. No API key is required.
 
-## AI Analyst (optional)
+The sample workspace includes post research, drafting, review, coding, tests, deployment, handoffs, retries, and human/agent/system activity.
 
-Flowsensa includes an optional AI chat layer powered by OpenRouter.
+## Bring Your Own Telemetry Log
 
-1. Get an API key at [openrouter.ai](https://openrouter.ai)
-2. Open **Settings → OpenRouter**, paste your key, choose a model, and click **Save & Connect**
-3. Keys are never persisted to storage or sent anywhere except OpenRouter
+Mnemosync can sync telemetry into FlowSensa, but it is not required. You can import:
 
-For private deployment, set `OPENROUTER_API_KEY` as an environment variable if you want to pre-configure the model server-side (not required for client-only use).
+- FlowSensa JSON work-event collections
+- BPMN or XML process models
+- Process images for BYOK-assisted candidate extraction
 
-## NPM scripts
+For the event schema, examples, prompts, and open source tooling options, see [docs/telemetry-log-guide.md](docs/telemetry-log-guide.md).
+
+At minimum, each event should identify:
+
+- the case or workflow instance;
+- the activity performed;
+- the actor (`human`, `agent`, `system`, `service-account`, or `external`);
+- optional tool/model context via `system.tool` and `system.model`;
+- result status and truth state;
+- provenance;
+- optional practical resources such as token counts, human time, compute, storage, network, or financial cost.
+
+Carbon, water, and energy/electricity resources are intentionally out of scope for this version.
+
+## AI Insights And BYOK
+
+The deterministic process-mining core works without a model key.
+
+Optional AI features use named OpenAI-compatible LLM profiles:
+
+1. Open **Settings -> LLM Profiles**.
+2. Name the profile so you know which provider/model it represents.
+3. Enter a base URL, model/deployment name, and API key.
+4. Use **Test connection** before asking AI Insights questions.
+
+Keys are kept in browser memory for the current session. They are not written to local storage, IndexedDB, exports, telemetry, logs, or the source bundle.
+
+## Storage Posture
+
+FlowSensa is local-first in the browser. Supabase-backed Mnemosync is useful for shared multi-agent telemetry, but FlowSensa should remain portable: JSON import/export is the escape hatch.
+
+If you want a stricter local-sovereignty setup, keep your telemetry log in SQLite or PGlite and export FlowSensa-compatible JSON when you want process analysis. Supabase remains a practical private-cloud option because the data can be migrated to self-hosted Postgres later.
+
+## NPM Scripts
 
 | Script | Purpose |
 |--------|---------|
@@ -37,4 +70,4 @@ For private deployment, set `OPENROUTER_API_KEY` as an environment variable if y
 
 ## Architecture
 
-All process data stays local (IndexedDB). No telemetry, no tracking. See `docs/architecture.md` and `.ai/sdd/` for full SDD artifacts.
+All workspace data stays local unless you explicitly sync from Mnemosync, import a file, invoke an LLM profile, or export a process map. See `docs/architecture.md` and `.ai/sdd/` for design artifacts.

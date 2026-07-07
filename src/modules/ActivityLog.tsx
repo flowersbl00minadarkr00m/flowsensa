@@ -72,7 +72,10 @@ export function ActivityLog({ activityLog, onOpenEvent }: Props) {
                 <th>Timestamp</th>
                 <th>Event ID</th>
                 <th>Case ID</th>
-                <th>Actor Type</th>
+                <th>Actor</th>
+                <th>System / model</th>
+                <th>Duration</th>
+                <th>Resources</th>
                 <th>Activity</th>
                 <th>Result</th>
                 <th>Truth</th>
@@ -105,7 +108,24 @@ export function ActivityLog({ activityLog, onOpenEvent }: Props) {
                     {row.caseId}
                   </td>
                   <td>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text)' }}>{row.actorType}</span>
+                    <strong style={{ fontSize: '0.75rem', color: 'var(--text)' }}>{row.actorLabel || row.actorId}</strong>
+                    <small style={{ display: 'block', color: 'var(--text-dim)' }}>{row.actorType} · {row.actorId}</small>
+                  </td>
+                  <td style={{ maxWidth: '180px', wordBreak: 'break-word' }}>
+                    {row.systemModel || row.systemTool || row.systemLabel ? (
+                      <>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text)' }}>{row.systemModel ?? row.systemTool ?? row.systemLabel}</span>
+                        <small style={{ display: 'block', color: 'var(--text-dim)' }}>{[row.systemTool, row.systemLabel].filter(Boolean).join(' · ')}</small>
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--text-dim)' }}>-</span>
+                    )}
+                  </td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    {row.durationMs !== undefined ? `${Math.round(row.durationMs / 1000)}s` : '-'}
+                  </td>
+                  <td style={{ maxWidth: '220px', wordBreak: 'break-word', fontSize: '0.68rem', color: 'var(--text-dim)' }}>
+                    {row.resourceSummary ?? '-'}
                   </td>
                   <td style={{ maxWidth: '200px', wordBreak: 'break-word' }}>{row.activityLabel}</td>
                   <td>

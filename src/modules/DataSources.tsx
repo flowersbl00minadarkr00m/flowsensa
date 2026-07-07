@@ -94,13 +94,13 @@ export function DataSources({
           <div>
             <h3 style={{ margin: '0 0 0.4rem' }}>Manual Import</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: 0 }}>
-              Import a Flowsensa-compatible JSON event collection from file.
+              Import a Flowsensa-compatible telemetry log, BPMN model, or process image from file.
             </p>
           </div>
           <label style={{ flexShrink: 0 }}>
             <input
               type="file"
-              accept="application/json,.json"
+              accept="application/json,.json,.bpmn,.xml,image/*"
               style={{ display: 'none' }}
               onChange={e => {
                 const file = e.target.files?.[0];

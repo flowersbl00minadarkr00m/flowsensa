@@ -179,8 +179,6 @@
             "cached-tokens",
             "reasoning-tokens",
             "human-time",
-            "electricity",
-            "water",
             "compute",
             "storage",
             "network"

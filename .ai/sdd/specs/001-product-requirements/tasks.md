@@ -451,6 +451,40 @@
 
 ---
 
+### T21 - Product resonance implementation slice
+**Priority:** P0 | **Estimate:** 4h | **Dependencies:** T01-T20
+
+**Approval:** Henry approved advancing these product resonance fixes to `tasks:approved` on 2026-07-07.
+
+**Work:**
+- [x] Reframe the first loaded workspace screen from a generic operational dashboard to a living creator/project work-loop view.
+- [x] Collapse the visible primary navigation around Observe, Map, Confirm, Improve, and keep advanced modules reachable without removing existing functionality.
+- [x] Make recommendation surfaces visibly provisional until process truth has been confirmed or corrected.
+- [x] Strengthen node/opportunity evidence affordances so process-mining claims point back to activity-log telemetry.
+- [x] Rework opportunity language around practical intervention choices: automate, AI assist, guarded hybrid, simplify, or keep human-owned.
+- [x] Preserve OpenRouter BYOK: session-only key entry, custom model ID support, test connection, disconnect, and no key persistence.
+- [x] Fix desktop landing composition and mobile polish issues found in review.
+- [x] Remove stale accounts-payable/Northstar narrative from default runtime and docs.
+
+**Acceptance criteria:**
+- The default workspace immediately communicates Henry-like human-agent post/project work.
+- BYOK remains available under Settings -> OpenRouter and continues to accept arbitrary OpenRouter model IDs.
+- The deterministic process-mining core remains usable without a model key.
+- The app does not remove import/export, activity log, alerts, AI Analyst, or settings functionality.
+- Desktop and mobile layouts remain readable at 1280px and 375px.
+
+**Files:** `README.md`, `src/App.tsx`, `src/components/ImportPanel.tsx`, `src/modules/OperationalOverview.tsx`, `src/modules/ImprovementOpportunities.tsx`, `src/modules/AIAnalyst.tsx`, `src/styles/*.css`, targeted tests if required
+**Verification:** `npm run lint`, `npm test`, `npm run build`, targeted browser verification
+
+**Completion evidence (2026-07-07):**
+- `npm run lint` passed.
+- `npm test` passed: 14 unit tests.
+- `npm run build` passed.
+- `npm run test:e2e` passed: 5 Playwright tests.
+- Browser verification passed for landing, sample workspace, Improve, Settings/OpenRouter BYOK, and 375px mobile overview/map.
+
+---
+
 ## Requirement Coverage
 
 | Requirement | Task IDs |
@@ -477,4 +511,5 @@
 | FR-023 | T06 |
 | FR-024 | T14 |
 | FR-026 | T20 |
-| NFR-009 | T17, T18 |
+| NFR-009 | T17, T18, T21 |
+| NFR-010 | T21 |

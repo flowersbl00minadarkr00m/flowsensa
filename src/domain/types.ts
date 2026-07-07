@@ -12,8 +12,6 @@ export type ResourceKind =
   | "cached-tokens"
   | "reasoning-tokens"
   | "human-time"
-  | "electricity"
-  | "water"
   | "compute"
   | "storage"
   | "network";
@@ -339,12 +337,18 @@ export interface ActivityLogEntry {
   caseId: string;
   actorType: string;
   actorId: string;
+  actorLabel: string;
   activityLabel: string;
   resultStatus: string;
   truthState: string;
   sourceRef: string;
   ingestedAt: string;
   isDemo: boolean;
+  durationMs?: number;
+  systemLabel?: string;
+  systemTool?: string;
+  systemModel?: string;
+  resourceSummary?: string;
 }
 
 export interface KPISnapshot {
@@ -375,9 +379,52 @@ export interface AlertRule {
   description: string;
 }
 
-export interface OpenRouterConfig {
+export interface LLMProfile {
+  id: string;
+  name: string;
   key: string;
+  baseUrl: string;
   model: string;
+}
+
+export type OpenRouterConfig = LLMProfile;
+
+export interface ProcessMetadata {
+  id: string;
+  displayName: string;
+  source: "event-log" | "bpmn" | "image-extracted" | "manual";
+  confidence: number;
+  taskDisplayNames: Record<string, string>;
+  originalTaskLabels: Record<string, string>;
+}
+
+export interface TaskInsight {
+  nodeId: string;
+  eventCount: number;
+  caseCount: number;
+  actorMix: string[];
+  medianDurationMs?: number;
+  totalDurationMs: number;
+  exceptionCount: number;
+  retryCount: number;
+  reworkSignals: string[];
+  upstream: string[];
+  downstream: string[];
+  evidenceEventIds: string[];
+  insufficientTelemetry: string[];
+}
+
+export interface ProcessRisk {
+  id: string;
+  processId: string;
+  processName: string;
+  nodeId: string;
+  taskName: string;
+  riskIdentified: string;
+  riskMitigation: string;
+  severity: "low" | "medium" | "high";
+  source: "deterministic" | "llm-assisted";
+  evidenceEventIds: string[];
 }
 
 export interface FlowExport {

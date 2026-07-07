@@ -11,7 +11,7 @@ interface Props {
 }
 
 function formatThroughput(ms: number): string {
-  if (ms === 0) return '—';
+  if (ms === 0) return '-';
   const totalSeconds = ms / 1000;
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -19,6 +19,15 @@ function formatThroughput(ms: number): string {
   if (hours > 0) return `${hours}h ${minutes}m`;
   if (minutes > 0) return `${minutes}m ${seconds}s`;
   return `${seconds}s`;
+}
+
+function shortClass(label: string): string {
+  if (label.includes('Deterministic')) return 'Automate';
+  if (label.includes('Probabilistic')) return 'AI assist';
+  if (label.includes('Hybrid') || label.includes('Bounded')) return 'Guarded hybrid';
+  if (label.includes('Simplify')) return 'Simplify';
+  if (label.includes('manual') || label.includes('Manual')) return 'Keep human';
+  return 'More evidence';
 }
 
 export function OperationalOverview({
@@ -33,23 +42,80 @@ export function OperationalOverview({
   const totalNodes = graph?.nodes.length ?? 0;
   const confirmedNodes = graph?.nodes.filter(n => n.status === 'confirmed').length ?? 0;
   const healthPct = totalNodes > 0 ? Math.round((confirmedNodes / totalNodes) * 100) : 0;
-
   const activeAlerts = alerts.filter(a => a.status === 'active');
   const topRecs = recommendations.slice(0, 3);
+  const loopNodes = graph?.nodes.slice(0, 6) ?? [];
+  const provisional = confirmedNodes === 0;
 
   return (
-    <div className="module-content">
-      <div className="module-heading">
-        <h2>Operational Overview</h2>
-        <p>Real-time snapshot of your process intelligence workspace.</p>
+    <div className="module-content observe-screen">
+      <section className="work-loop-hero" aria-labelledby="observe-title">
+        <div className="work-loop-copy">
+          <p className="eyebrow">Human-agent work loop</p>
+          <h2 id="observe-title">Observe the actual path before changing the system.</h2>
+          <p>
+            Flowsensa is reading the creator/project sample as evidence: post research,
+            drafting, review, coding, testing, deployment, and verification. Confirm the
+            map first, then choose where to automate, add AI, simplify, or keep judgment human-owned.
+          </p>
+          <div className="work-loop-actions" aria-label="Primary workflow actions">
+            <button className="btn primary" type="button" onClick={() => onViewModule('explorer')}>
+              Map + confirm
+            </button>
+            <button className="btn" type="button" onClick={() => onViewModule('improvements')}>
+              Review interventions
+            </button>
+            <button className="btn ghost" type="button" onClick={onRunDemo}>
+              Run demo event
+            </button>
+          </div>
+        </div>
+
+        <div className="work-loop-card" aria-label="Observed process path preview">
+          <div className="card-header">
+            <h3>Observed path</h3>
+            <span className={provisional ? 'status-chip' : 'status-chip connected'}>
+              {confirmedNodes}/{totalNodes} confirmed
+            </span>
+          </div>
+          <ol className="loop-path">
+            {loopNodes.map((node, index) => (
+              <li key={node.id}>
+                <span className="loop-index">{String(index + 1).padStart(2, '0')}</span>
+                <div>
+                  <strong>{node.label}</strong>
+                  <span>{node.frequency} runs · {node.actorTypes.join(', ') || 'actor unknown'}</span>
+                </div>
+              </li>
+            ))}
+          </ol>
+          {loopNodes.length === 0 && (
+            <div className="empty-state">
+              <p>Import work events to reconstruct the path.</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <div className="truth-gate card">
+        <div>
+          <p className="eyebrow">Truth gate</p>
+          <h3>{provisional ? 'Recommendations are provisional until the map is confirmed.' : 'Confirmed truth is ready for improvement analysis.'}</h3>
+          <p>
+            Evidence-backed process mining is strongest when inferred activities,
+            ownership, and boundaries are corrected before automation decisions.
+          </p>
+        </div>
+        <button className="btn" type="button" onClick={() => onViewModule('explorer')}>
+          Open confirmation panel
+        </button>
       </div>
 
-      {/* KPI Strip */}
       <div className="kpi-strip">
         <article className="kpi-card">
           <span className="kpi-label">Cases</span>
           <span className="kpi-value">{kpis.caseCount}</span>
-          <span className="kpi-sublabel">Unique case IDs</span>
+          <span className="kpi-sublabel">Creator/project runs</span>
         </article>
         <article className="kpi-card">
           <span className="kpi-label">Median Throughput</span>
@@ -59,111 +125,64 @@ export function OperationalOverview({
         <article className="kpi-card">
           <span className="kpi-label">Exception Rate</span>
           <span className="kpi-value">{(kpis.exceptionRate * 100).toFixed(1)}%</span>
-          <span className="kpi-sublabel">Of all events</span>
+          <span className="kpi-sublabel">Failures and retries</span>
         </article>
         <article className="kpi-card">
-          <span className="kpi-label">Automation Coverage</span>
-          <span className="kpi-value">{(kpis.automationCoverageRate * 100).toFixed(0)}%</span>
-          <span className="kpi-sublabel">Confirmed nodes</span>
+          <span className="kpi-label">Truth Confirmed</span>
+          <span className="kpi-value">{healthPct}%</span>
+          <span className="kpi-sublabel">{confirmedNodes} of {totalNodes} steps</span>
         </article>
       </div>
 
-      {/* Process Health Bar */}
-      <div className="health-bar-wrap card" style={{ marginBottom: '1.2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-            Process health — {confirmedNodes} / {totalNodes} nodes confirmed
-          </span>
-          <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
-            {healthPct}%
-          </span>
-        </div>
-        <div className="health-bar-track">
-          <div className="health-bar-fill" style={{ width: `${healthPct}%` }} />
-        </div>
-      </div>
-
-      {/* Two-column grid */}
       <div className="two-col-grid" style={{ marginBottom: '1.5rem' }}>
-        {/* Top opportunities */}
         <div className="card">
           <div className="card-header">
-            <h3>Top Opportunities</h3>
+            <h3>Top interventions</h3>
             <span className="badge">{recommendations.length}</span>
           </div>
           {topRecs.length === 0 ? (
             <div className="empty-state" style={{ padding: '1.5rem' }}>
-              <p>No recommendations yet. Import process events to begin.</p>
+              <p>No interventions yet. Import process events to begin.</p>
             </div>
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.6rem' }}>
+            <ul className="intervention-list">
               {topRecs.map(rec => (
-                <li
-                  key={rec.nodeId}
-                  style={{
-                    padding: '0.6rem',
-                    background: 'var(--surface-2)',
-                    borderRadius: 'var(--radius)',
-                    fontSize: '0.82rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong style={{ color: 'var(--text)' }}>{rec.nodeId}</strong>
-                    <span style={{ color: 'var(--accent)', fontSize: '0.7rem', fontFamily: 'var(--font-mono)' }}>
-                      {Math.round(rec.confidence * 100)}%
-                    </span>
+                <li key={rec.nodeId}>
+                  <div>
+                    <strong>{rec.nodeId}</strong>
+                    <span>{shortClass(rec.recommendationClass)}</span>
                   </div>
-                  <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                    {rec.recommendationClass}
-                  </p>
+                  <small>{Math.round(rec.confidence * 100)}%</small>
                 </li>
               ))}
             </ul>
           )}
         </div>
 
-        {/* Alert feed */}
         <div className="card">
           <div className="card-header">
-            <h3>Alert Feed</h3>
-            <button
-              className="btn ghost"
-              style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
-              type="button"
-              onClick={() => onViewModule('alerts')}
-            >
-              View all →
+            <h3>Evidence health</h3>
+            <button className="btn ghost" type="button" onClick={() => onViewModule('activity')}>
+              Open log
             </button>
           </div>
-          {activeAlerts.length === 0 ? (
-            <div className="empty-state" style={{ padding: '1.5rem' }}>
-              <p>No active alerts.</p>
-            </div>
-          ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.5rem' }}>
-              {activeAlerts.slice(0, 5).map(alert => (
-                <li key={alert.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
-                  <span className={`alert-chip ${alert.severity}`}>{alert.severity}</span>
-                  <span style={{ color: 'var(--text)', flex: 1 }}>{alert.description}</span>
-                </li>
-              ))}
-            </ul>
+          <dl className="evidence-health">
+            <div><dt>Events</dt><dd>{events.length}</dd></div>
+            <div><dt>Variants</dt><dd>{graph?.variants.length ?? 0}</dd></div>
+            <div><dt>Active alerts</dt><dd>{activeAlerts.length}</dd></div>
+          </dl>
+          {activeAlerts.length > 0 && (
+            <p className="microcopy">{activeAlerts[0]?.description}</p>
           )}
         </div>
       </div>
 
-      {/* Actions */}
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="btn primary" type="button" onClick={onRunDemo}>
           Run demo activity
         </button>
-        <button
-          className="btn ghost"
-          type="button"
-          onClick={() => onViewModule('alerts')}
-          style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}
-        >
-          View full alert log
+        <button className="btn ghost" type="button" onClick={() => onViewModule('sources')}>
+          Manage data
         </button>
         <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>
           {events.length} events · schema v1.0.0

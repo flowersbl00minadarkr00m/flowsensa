@@ -15,24 +15,24 @@ test("complete fixture workflow is keyboard-operable and local", async ({ page }
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Explore sample workspace" }).click();
   await expect(page.getByText("08", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Process workspace")).toBeVisible();
+  await expect(page.getByText("Process Workspace")).toBeVisible();
   await expect(page.getByText("sample data", { exact: false })).toBeVisible();
-  await expect(page.getByRole("status")).toContainText("50 accepted");
+  await expect(page.locator(".workspace-import-status")).toContainText("Sample workspace loaded locally");
 
-  await page.getByRole("button", { name: "Process Explorer" }).click();
-  await expect(page.getByRole("heading", { name: "Process Graph" })).toBeVisible();
+  await page.getByRole("button", { name: "Process Map", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Process Map" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Process Risks/ })).toBeVisible();
 
-  await page.getByRole("button", { name: "Improvement Opportunities" }).click();
-  await expect(page.getByRole("heading", { name: "Improvement Opportunities" })).toBeVisible();
-  await expect(page.getByText("Responsibility & Control Gaps")).toBeVisible();
-  await page.getByLabel("Family").selectOption("Automation");
+  await page.getByRole("button", { name: /Process Enhancements/ }).click();
+  await expect(page.getByRole("heading", { name: "Process Enhancements" })).toBeVisible();
+  await expect(page.getByText("Responsibility and control gaps")).toBeVisible();
+  await page.locator(".filter-bar select").selectOption("Automation");
   await expect(page.getByRole("heading", { name: "Draft post" })).toBeVisible();
-  await page.getByLabel("Family").selectOption("Hybrid");
+  await page.locator(".filter-bar select").selectOption("Hybrid");
   await expect(page.getByRole("heading", { name: "Research topic" })).toBeVisible();
 
-  await page.getByRole("button", { name: "AI Analyst" }).click();
+  await page.getByRole("button", { name: "AI Insights" }).click();
   await expect(page.getByRole("heading", { name: "Deterministic Analysis" })).toBeVisible();
 
   await page.getByRole("button", { name: "Settings" }).click();
@@ -48,20 +48,19 @@ test("complete fixture workflow is keyboard-operable and local", async ({ page }
 
 test("invalid fixture shows event and field errors without replacing valid data", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Test error handling" }).click();
+  const fileInput = page.locator('input[type="file"]');
+  await fileInput.setInputFiles("src/fixtures/invalid-work-events.json");
   await expect(page.getByRole("alert")).toContainText("Import blocked");
-  await expect(page.getByRole("alert")).toContainText("actor/authorityLevel");
-  await expect(page.getByRole("alert")).toContainText("resources/1/allocationMethod");
-  await expect(page.getByRole("alert")).toContainText("events[0]");
+  await expect(page.getByRole("alert")).toContainText("schema issues");
+  await expect(page.getByRole("alert")).toContainText("/exportedAt");
 });
 
 test("narrow viewport uses bottom tabs, drawer, and More sheet without overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("button", { name: "Explore sample workspace" }).click();
 
-  for (const name of ["Overview", "Explorer", "Activity", "Improve", "Sources", "More"]) {
-    await expect(page.getByRole("button", { name: new RegExp(name) })).toBeVisible();
+  for (const name of ["Map", "Risks", "Evidence", "Enhance", "Sources", "More"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
   }
 
   await expect
@@ -70,23 +69,22 @@ test("narrow viewport uses bottom tabs, drawer, and More sheet without overflow"
 
   await page.getByRole("button", { name: "Open navigation" }).click();
   await expect(page.getByRole("dialog", { name: "Navigation" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Operational Overview" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Navigation" }).getByRole("button", { name: /Process Map/ })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Navigation" })).toHaveCount(0);
 
   await page.getByRole("button", { name: /More/ }).click();
   await expect(page.getByRole("dialog", { name: "More modules" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Process Variants" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Variants/ })).toBeVisible();
 });
 
 test("an imported valid file replaces the showcase locally", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Explore sample workspace" }).click();
   await expect(page.getByText("· sample data")).toBeVisible();
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles("src/fixtures/sample-work-events.json");
   // Imported non-sample data drops the "sample data" marker from the header.
-  await expect(page.getByText("Process workspace")).toBeVisible();
+  await expect(page.getByText("Process Workspace")).toBeVisible();
   await expect(page.getByText("· sample data")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sync with Mnemosync" })).toBeVisible();
 });

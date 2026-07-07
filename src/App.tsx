@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventDialog } from "./components/EventDialog";
-import { ImportPanel } from "./components/ImportPanel";
 import { calculateKPIs } from "./lib/kpiEngine";
 import { DEFAULT_ALERT_RULES, evaluateAlerts } from "./lib/alertEngine";
 import { emitDemoEvent } from "./lib/demoProducer";
@@ -10,11 +9,12 @@ import { ProcessVariants } from "./modules/ProcessVariants";
 import { ActivityLog } from "./modules/ActivityLog";
 import { PerformanceAnalysis } from "./modules/PerformanceAnalysis";
 import { ImprovementOpportunities } from "./modules/ImprovementOpportunities";
+import { ProcessRisks } from "./modules/ProcessRisks";
 import { AlertsModule } from "./modules/AlertsModule";
 import { AIAnalyst } from "./modules/AIAnalyst";
 import { DataSources } from "./modules/DataSources";
 import { SettingsModule } from "./modules/SettingsModule";
-import type { ActivityLogEntry, Alert, KPISnapshot, OpenRouterConfig } from "./domain/types";
+import type { ActivityLogEntry, Alert, KPISnapshot, LLMProfile } from "./domain/types";
 import { answerQuestion } from "./domain/analyst";
 import { JsonFileTelemetryAdapter } from "./domain/adapters";
 import { discoverProcess } from "./domain/discovery";
@@ -23,6 +23,8 @@ import {
   downloadText,
   exportMarkdown,
   exportMermaid,
+  exportProcessMapMarkdown,
+  exportProcessMapJson,
   validateFlowExport,
 } from "./domain/exports";
 import { detectGaps } from "./domain/gaps";
@@ -35,15 +37,22 @@ import {
   loadWorkspace,
   saveWorkspace,
 } from "./domain/storage";
+import { importBpmnAsEvents } from "./domain/bpmnImport";
+import { buildTaskInsights } from "./domain/processInsights";
+import { createDefaultProcessMetadata } from "./domain/processMetadata";
+import { buildProcessRisks } from "./domain/processRisks";
+import { createImageProcessExtractionRequest } from "./domain/imageProcessImport";
 import type {
   FlowExport,
   GraphEdge,
   GraphNode,
   OverrideRecord,
   PrimitiveRegistry,
+  ProcessMetadata,
   ProcessGraph,
   Recommendation,
   RecommendationClass,
+  WorkEvent,
   WorkEventCollection,
 } from "./domain/types";
 import {
@@ -51,7 +60,6 @@ import {
   validatePrimitiveRegistry,
   validateWorkEvents,
 } from "./domain/validation";
-import invalidFixture from "./fixtures/invalid-work-events.json";
 import primitiveFixture from "./fixtures/work-primitives.json";
 import { showcaseWorkEvents } from "./fixtures/showcase-work-events";
 import { syncFromMnemosync } from "./lib/mnemosyncSync";
@@ -59,6 +67,7 @@ import { syncFromMnemosync } from "./lib/mnemosyncSync";
 type View =
   | "overview"
   | "explorer"
+  | "risks"
   | "variants"
   | "activity"
   | "performance"
@@ -74,31 +83,35 @@ interface HistoryEntry {
   recommendations: Recommendation[];
 }
 
-const NAV_ITEMS: Array<{ id: View; label: string; number: string }> = [
-  { id: "overview", label: "Operational Overview", number: "01" },
-  { id: "explorer", label: "Process Explorer", number: "02" },
-  { id: "variants", label: "Process Variants", number: "03" },
-  { id: "activity", label: "Activity Log", number: "04" },
-  { id: "performance", label: "Performance Analysis", number: "05" },
-  { id: "improvements", label: "Improvement Opportunities", number: "06" },
-  { id: "alerts", label: "Alerts", number: "07" },
-  { id: "analyst", label: "AI Analyst", number: "08" },
-  { id: "sources", label: "Data Sources", number: "09" },
-  { id: "settings", label: "Settings", number: "10" },
+const NAV_ITEMS: Array<{ id: View; label: string; number: string; group: "primary" | "advanced" }> = [
+  { id: "explorer", label: "Process Map", number: "01", group: "primary" },
+  { id: "risks", label: "Process Risks", number: "02", group: "primary" },
+  { id: "improvements", label: "Process Enhancements", number: "03", group: "primary" },
+  { id: "activity", label: "Evidence Log", number: "04", group: "primary" },
+  { id: "variants", label: "Variants", number: "05", group: "advanced" },
+  { id: "performance", label: "Performance", number: "06", group: "advanced" },
+  { id: "alerts", label: "Alerts", number: "07", group: "advanced" },
+  { id: "analyst", label: "AI Insights", number: "08", group: "advanced" },
+  { id: "sources", label: "Data", number: "09", group: "advanced" },
+  { id: "settings", label: "Settings", number: "10", group: "advanced" },
 ] as const;
 
-const BOTTOM_TABS: View[] = ["overview", "explorer", "activity", "improvements", "sources"];
+const PRIMARY_NAV_ITEMS = NAV_ITEMS.filter((item) => item.group === "primary");
+const ADVANCED_NAV_ITEMS = NAV_ITEMS.filter((item) => item.group === "advanced");
+
+const BOTTOM_TABS: View[] = ["explorer", "risks", "improvements", "activity", "sources"];
 const MORE_ITEMS: View[] = ["variants", "performance", "alerts", "analyst", "settings"];
 
 const TAB_LABELS: Record<View, string> = {
   overview: "Overview",
-  explorer: "Explorer",
+  explorer: "Map",
+  risks: "Risks",
   variants: "Variants",
-  activity: "Activity",
+  activity: "Evidence",
   performance: "Perf",
-  improvements: "Improve",
+  improvements: "Enhance",
   alerts: "Alerts",
-  analyst: "Analyst",
+  analyst: "Insights",
   sources: "Sources",
   settings: "Settings",
 };
@@ -109,12 +122,53 @@ function cloneGraph(graph: ProcessGraph): ProcessGraph {
   return structuredClone(graph);
 }
 
+function FlowLogo({ small = false }: { small?: boolean }) {
+  return (
+    <div className={`flow-logo${small ? " small" : ""}`} aria-hidden="true">
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
 function overrideId(): string {
   return `override-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function summarizeResources(event: WorkEvent): string | undefined {
+  if (!event.resources?.length) return undefined;
+  return event.resources
+    .map((resource) => {
+      const value = resource.value === null ? "unknown" : resource.value;
+      return `${resource.kind}: ${value} ${resource.unit}`;
+    })
+    .join("; ");
+}
+
+function toActivityLogEntry(event: WorkEvent): ActivityLogEntry {
+  return {
+    eventId: event.eventId,
+    caseId: event.caseId,
+    actorType: event.actor.type,
+    actorId: event.actor.id,
+    actorLabel: event.actor.label,
+    activityLabel: event.activity.label,
+    resultStatus: event.result.status,
+    truthState: event.truthState,
+    sourceRef: event.provenance.sourceRef,
+    ingestedAt: event.provenance.ingestedAt,
+    isDemo: !!event.tags?.includes("live-demo"),
+    durationMs: event.durationMs,
+    systemLabel: event.system?.label,
+    systemTool: event.system?.tool,
+    systemModel: event.system?.model,
+    resourceSummary: summarizeResources(event),
+  };
+}
+
 export function App() {
-  const [view, setView] = useState<View>("overview");
+  const [view, setView] = useState<View>("explorer");
   const [events, setEvents] = useState<WorkEventCollection>();
   const [registry, setRegistry] = useState<PrimitiveRegistry>();
   const [inferredGraph, setInferredGraph] = useState<ProcessGraph>();
@@ -129,7 +183,8 @@ export function App() {
   const [previewType, setPreviewType] = useState<"JSON" | "Markdown" | "Mermaid">("JSON");
   const [hydrated, setHydrated] = useState(false);
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
-  const [openRouterConfig, setOpenRouterConfig] = useState<OpenRouterConfig | null>(null);
+  const [llmProfile, setLlmProfile] = useState<LLMProfile | null>(null);
+  const [processMetadata, setProcessMetadata] = useState<ProcessMetadata>();
   const [demoCounter, setDemoCounter] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
@@ -166,6 +221,16 @@ export function App() {
   const alerts = useMemo(
     () => rawAlerts.map(a => ({ ...a, status: alertUpdates.get(a.id) ?? a.status })),
     [rawAlerts, alertUpdates],
+  );
+
+  const taskInsights = useMemo(
+    () => (graph && events ? buildTaskInsights(graph, events.events) : []),
+    [graph, events],
+  );
+
+  const processRisks = useMemo(
+    () => processMetadata ? buildProcessRisks(processMetadata, taskInsights, recommendations) : [],
+    [processMetadata, taskInsights, recommendations],
   );
 
   const flowExport = useMemo<FlowExport | undefined>(() => {
@@ -232,6 +297,28 @@ export function App() {
     setTimeout(() => setToastMsg(null), 3000);
   }
 
+  function loadShowcaseWorkspace(summary?: string) {
+    const primitiveResult = validatePrimitiveRegistry(primitiveFixture);
+    if (!primitiveResult.valid || !primitiveResult.data) {
+      setIssues(primitiveResult.issues);
+      setImportSummary("Primitive registry validation failed; sample workspace blocked.");
+      return;
+    }
+    const showcaseGraph = discoverProcess(showcaseWorkEvents);
+    setEvents(showcaseWorkEvents);
+    setRegistry(primitiveResult.data);
+    setInferredGraph(cloneGraph(showcaseGraph));
+    setGraph(cloneGraph(showcaseGraph));
+    setProcessMetadata(createDefaultProcessMetadata(showcaseGraph, showcaseWorkEvents, "Sample workspace", "event-log"));
+    setRecommendations(recommendTreatments(showcaseGraph.nodes, showcaseWorkEvents.events));
+    setOverrides([]);
+    setHistory([]);
+    setIssues([]);
+    setActivityLog(showcaseWorkEvents.events.map(toActivityLogEntry));
+    setView("explorer");
+    if (summary) setImportSummary(summary);
+  }
+
   // Lock body scroll + focus trap helpers
   function lockScroll() { document.body.style.overflow = "hidden"; }
   function unlockScroll() { document.body.style.overflow = ""; }
@@ -270,6 +357,8 @@ export function App() {
         return;
       }
       const inferred = discoverProcess(eventResult.data);
+      const metadataSource: ProcessMetadata["source"] =
+        eventResult.data.events.some((event) => event.tags?.includes("bpmn-import")) ? "bpmn" : "event-log";
       const initialRecommendations = recommendTreatments(
         inferred.nodes,
         eventResult.data.events,
@@ -279,17 +368,12 @@ export function App() {
       setInferredGraph(cloneGraph(inferred));
       setGraph(cloneGraph(inferred));
       setRecommendations(initialRecommendations);
+      setProcessMetadata(createDefaultProcessMetadata(inferred, eventResult.data, label.replace(/\.[^.]+$/, ""), metadataSource));
       setOverrides([]);
       setHistory([]);
       setIssues([]);
-      setView("overview");
-      setActivityLog(eventResult.data.events.map(e => ({
-        eventId: e.eventId, caseId: e.caseId, actorType: e.actor.type,
-        actorId: e.actor.id, activityLabel: e.activity.label,
-        resultStatus: e.result.status, truthState: e.truthState,
-        sourceRef: e.provenance.sourceRef, ingestedAt: e.provenance.ingestedAt,
-        isDemo: !!e.tags?.includes("live-demo"),
-      })));
+      setView("explorer");
+      setActivityLog(eventResult.data.events.map(toActivityLogEntry));
       setImportSummary(
         `${label}: ${eventResult.acceptedCount} accepted, 0 rejected; ${inferred.variants.length} variants proposed.`,
       );
@@ -305,6 +389,37 @@ export function App() {
       setImportSummary(`${label}: import blocked; existing local data was preserved.`);
     }
   }, []);
+
+  const handleWorkspaceFile = useCallback(async (file: File) => {
+    const fileName = file.name.toLowerCase();
+    const text = await file.text();
+    if (fileName.endsWith(".bpmn") || fileName.endsWith(".xml") || file.type.includes("xml")) {
+      try {
+        await importPayload(importBpmnAsEvents(text, file.name), file.name);
+      } catch (error) {
+        setIssues([{
+          eventId: "collection",
+          field: "(bpmn)",
+          reason: error instanceof Error ? error.message : "Unable to parse BPMN XML.",
+          keyword: "parse",
+        }]);
+        setImportSummary(`${file.name}: import blocked; existing local data was preserved.`);
+      }
+      return;
+    }
+
+    if (file.type.startsWith("image/")) {
+      if (!llmProfile) {
+        setImportSummary(`${file.name}: image analysis needs a named LLM profile in Settings before extraction.`);
+        return;
+      }
+      const request = createImageProcessExtractionRequest(file);
+      setImportSummary(`${request.fileName}: AI-assisted image extraction is ready for ${llmProfile.name}. Candidate maps must be confirmed before replacing the current process.`);
+      return;
+    }
+
+    await importPayload(text, file.name);
+  }, [importPayload, llmProfile]);
 
   const handleSyncMnemosync = useCallback(async () => {
     setSyncing(true);
@@ -333,24 +448,16 @@ export function App() {
       setEvents(merged);
       setGraph(cloneGraph(inferred));
       setInferredGraph(cloneGraph(inferred));
+      setProcessMetadata((current) =>
+        current
+          ? { ...createDefaultProcessMetadata(inferred, merged, current.displayName, current.source), taskDisplayNames: current.taskDisplayNames }
+          : createDefaultProcessMetadata(inferred, merged),
+      );
       setRecommendations(newRecs);
     } else {
       void importPayload(collection, "Demo event");
     }
-    setActivityLog(prev =>
-      [{
-        eventId: event.eventId,
-        caseId: event.caseId,
-        actorType: event.actor.type,
-        actorId: event.actor.id,
-        activityLabel: event.activity.label,
-        resultStatus: event.result.status,
-        truthState: event.truthState,
-        sourceRef: event.provenance.sourceRef,
-        ingestedAt: event.provenance.ingestedAt,
-        isDemo: true,
-      }, ...prev].slice(0, 500)
-    );
+    setActivityLog(prev => [toActivityLogEntry(event), ...prev].slice(0, 500));
     setDemoCounter(c => c + 1);
     showToast(`Demo event ingested: ${event.eventId}`);
   }, [demoCounter, events, importPayload]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -383,6 +490,11 @@ export function App() {
     setEvents(cleaned);
     setGraph(cloneGraph(inferred));
     setInferredGraph(cloneGraph(inferred));
+    setProcessMetadata((current) =>
+      current
+        ? { ...createDefaultProcessMetadata(inferred, cleaned, current.displayName, current.source), taskDisplayNames: current.taskDisplayNames }
+        : createDefaultProcessMetadata(inferred, cleaned),
+    );
     setRecommendations(recommendTreatments(inferred.nodes, cleaned.events));
     setActivityLog(prev => prev.filter(e => !e.isDemo));
     setDemoCounter(0);
@@ -392,43 +504,29 @@ export function App() {
   useEffect(() => {
     void loadWorkspace()
       .then((stored) => {
+        if (!stored) {
+          loadShowcaseWorkspace("Sample workspace loaded locally.");
+          return;
+        }
         if (stored && validateFlowExport(stored.exportState)) {
           const legacyFixture = stored.events.events.every((event) =>
             event.tags?.includes("fixture"),
           );
           if (legacyFixture) {
-            const showcaseGraph = discoverProcess(showcaseWorkEvents);
-            setEvents(showcaseWorkEvents);
-            setRegistry(stored.primitives);
-            setInferredGraph(cloneGraph(showcaseGraph));
-            setGraph(cloneGraph(showcaseGraph));
-            setRecommendations(
-              recommendTreatments(showcaseGraph.nodes, showcaseWorkEvents.events),
-            );
-            setOverrides([]);
-            setActivityLog(showcaseWorkEvents.events.map(e => ({
-              eventId: e.eventId, caseId: e.caseId, actorType: e.actor.type,
-              actorId: e.actor.id, activityLabel: e.activity.label,
-              resultStatus: e.result.status, truthState: e.truthState,
-              sourceRef: e.provenance.sourceRef, ingestedAt: e.provenance.ingestedAt,
-              isDemo: !!e.tags?.includes("live-demo"),
-            })));
+            loadShowcaseWorkspace("Sample workspace loaded locally.");
             return;
           }
           setEvents(stored.events);
           setRegistry(stored.primitives);
           setInferredGraph(stored.exportState.inferredGraph);
           setGraph(stored.exportState.confirmedGraph);
+          setProcessMetadata(createDefaultProcessMetadata(stored.exportState.confirmedGraph, stored.events, "Imported operational process", "event-log"));
           setRecommendations(stored.exportState.recommendations);
           setOverrides(stored.exportState.overrides);
-          setActivityLog(stored.events.events.map(e => ({
-            eventId: e.eventId, caseId: e.caseId, actorType: e.actor.type,
-            actorId: e.actor.id, activityLabel: e.activity.label,
-            resultStatus: e.result.status, truthState: e.truthState,
-            sourceRef: e.provenance.sourceRef, ingestedAt: e.provenance.ingestedAt,
-            isDemo: !!e.tags?.includes("live-demo"),
-          })));
+          setActivityLog(stored.events.events.map(toActivityLogEntry));
+          return;
         }
+        loadShowcaseWorkspace("Stored workspace was invalid. Sample workspace loaded locally.");
       })
       .finally(() => setHydrated(true));
   }, []);
@@ -682,25 +780,55 @@ export function App() {
     setHistory((current) => current.slice(0, -1));
   }, [history]);
 
+  const handleProcessRename = useCallback((displayName: string) => {
+    const next = displayName.trim();
+    if (!next) return;
+    setProcessMetadata((current) => current ? { ...current, displayName: next } : current);
+  }, []);
+
+  const handleTaskRename = useCallback((nodeId: string, displayName: string) => {
+    const next = displayName.trim();
+    if (!next) return;
+    setProcessMetadata((current) =>
+      current
+        ? {
+            ...current,
+            taskDisplayNames: {
+              ...current.taskDisplayNames,
+              [nodeId]: next,
+            },
+          }
+        : current,
+    );
+  }, []);
+
+  const handleProcessMapExport = useCallback((format: "JSON" | "Markdown") => {
+    if (!graph || !processMetadata) return;
+    if (format === "JSON") {
+      downloadText(
+        "flowsensa-process-map.json",
+        exportProcessMapJson(graph, processMetadata, taskInsights),
+        "application/json",
+      );
+      return;
+    }
+    downloadText(
+      "flowsensa-process-map.md",
+      exportProcessMapMarkdown(graph, processMetadata, taskInsights),
+      "text/markdown",
+    );
+  }, [graph, processMetadata, taskInsights]);
+
   const handleClear = useCallback(async () => {
     await clearWorkspace();
-    setEvents(undefined);
-    setRegistry(undefined);
-    setInferredGraph(undefined);
-    setGraph(undefined);
-    setRecommendations([]);
-    setOverrides([]);
-    setHistory([]);
-    setIssues([]);
-    setActivityLog([]);
     setDemoCounter(0);
-    setImportSummary("Local workspace deleted from IndexedDB.");
+    loadShowcaseWorkspace("Local workspace deleted. Sample workspace loaded locally.");
   }, []);
 
   if (!hydrated) {
     return (
       <main id="main" className="loading-shell" aria-busy="true">
-        <div className="brand-mark">F</div>
+        <FlowLogo />
         <p className="eyebrow">Restoring local workspace</p>
         <h1>Loading Flowsensa…</h1>
       </main>
@@ -709,21 +837,10 @@ export function App() {
 
   if (!events || !registry || !inferredGraph || !graph) {
     return (
-      <main id="main" className="landing-shell">
-        <header className="brand-header">
-          <div className="brand-mark">F</div>
-          <div><strong>Flowsensa</strong><span>Runtime Process Engineer</span></div>
-        </header>
-        <ImportPanel
-          issues={issues}
-          importSummary={importSummary}
-          syncing={syncing}
-          onSync={() => void handleSyncMnemosync()}
-          onDemo={() => void importPayload(showcaseWorkEvents, "Sample workspace")}
-          onInvalidDemo={() => void importPayload(invalidFixture, "Invalid fixture")}
-          onFile={(file) => void file.text().then((text) => importPayload(text, file.name))}
-        />
-        <footer>Supabase telemetry → Flowsensa process intelligence</footer>
+      <main id="main" className="loading-shell" aria-busy="true">
+        <FlowLogo />
+        <p className="eyebrow">Preparing local workspace</p>
+        <h1>Opening process map...</h1>
       </main>
     );
   }
@@ -749,12 +866,26 @@ export function App() {
             onKeyDown={handleMobileNavKeyDown}
           >
             <div className="mobile-drawer-header">
-              <div className="brand-mark" style={{ width: "1.8rem", height: "1.8rem", fontSize: "0.8rem" }}>F</div>
+              <FlowLogo small />
               <strong>Flowsensa</strong>
               <button className="mobile-drawer-close" onClick={closeMobileNav} aria-label="Close navigation" type="button">✕</button>
             </div>
             <nav className="mobile-drawer-nav" aria-label="Process modules">
-              {NAV_ITEMS.map((item) => (
+              <span className="nav-section-label">Core workflow</span>
+              {PRIMARY_NAV_ITEMS.map((item) => (
+                <button
+                  key={item.id}
+                  className={`mobile-drawer-link${view === item.id ? " active" : ""}`}
+                  type="button"
+                  aria-current={view === item.id ? "page" : undefined}
+                  onClick={() => selectView(item.id)}
+                >
+                  <span className="mobile-drawer-num">{item.number}</span>
+                  {item.label}
+                </button>
+              ))}
+              <span className="nav-section-label">Analysis and setup</span>
+              {ADVANCED_NAV_ITEMS.map((item) => (
                 <button
                   key={item.id}
                   className={`mobile-drawer-link${view === item.id ? " active" : ""}`}
@@ -841,14 +972,27 @@ export function App() {
 
       <aside className="sidebar">
         <div className="brand-header">
-          <div className="brand-mark">F</div>
+          <FlowLogo />
           <div className="brand-name">
             <strong>Flowsensa</strong>
             <span>Process intelligence</span>
           </div>
         </div>
         <nav aria-label="Process modules">
-          {NAV_ITEMS.map((item) => (
+          <span className="nav-section-label">Core workflow</span>
+          {PRIMARY_NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              className={view === item.id ? "active" : ""}
+              type="button"
+              aria-current={view === item.id ? "page" : undefined}
+              onClick={() => setView(item.id)}
+            >
+              <span className="nav-num">{item.number}</span>{item.label}
+            </button>
+          ))}
+          <span className="nav-section-label">Analysis and setup</span>
+          {ADVANCED_NAV_ITEMS.map((item) => (
             <button
               key={item.id}
               className={view === item.id ? "active" : ""}
@@ -896,7 +1040,7 @@ export function App() {
               ☰
             </button>
             <div>
-              <strong>Process workspace</strong>
+              <strong>Process Workspace</strong>
               <span>
                 {events.events.length} events · {graph.nodes.length} steps · schema v{events.schemaVersion}
                 {isShowcase ? " · sample data" : ""}
@@ -922,7 +1066,7 @@ export function App() {
               type="button"
               onClick={() => workspaceFileInputRef.current?.click()}
             >
-              Import JSON
+              Import process
             </button>
           </div>
         </header>
@@ -931,12 +1075,10 @@ export function App() {
           ref={workspaceFileInputRef}
           className="visually-hidden"
           type="file"
-          accept="application/json,.json"
+          accept="application/json,.json,.bpmn,.xml,image/*"
           onChange={(event) => {
             const file = event.target.files?.[0];
-            if (file) {
-              void file.text().then((text) => importPayload(text, file.name));
-            }
+            if (file) void handleWorkspaceFile(file);
             event.target.value = "";
           }}
         />
@@ -972,13 +1114,26 @@ export function App() {
             inferredGraph={inferredGraph}
             events={events.events}
             registry={registry}
+            processMetadata={processMetadata}
+            taskInsights={taskInsights}
             overrides={overrides}
             canUndo={history.length > 0}
+            onProcessRename={handleProcessRename}
+            onTaskRename={handleTaskRename}
+            onExportMap={handleProcessMapExport}
             onNodeChange={handleNodeChange}
             onEdgeChange={handleEdgeChange}
             onMerge={handleMerge}
             onSplit={handleSplit}
             onUndo={handleUndo}
+            onOpenEvent={setSelectedEventId}
+          />
+        )}
+        {view === "risks" && processMetadata && (
+          <ProcessRisks
+            metadata={processMetadata}
+            risks={processRisks}
+            llmProfile={llmProfile}
             onOpenEvent={setSelectedEventId}
           />
         )}
@@ -1019,7 +1174,7 @@ export function App() {
             gaps={gaps}
             recommendations={recommendations}
             kpis={kpis}
-            openRouterConfig={openRouterConfig}
+            llmProfile={llmProfile}
             selectedQuestion={selectedQuestion}
             analystAnswer={analystAnswer}
             onQuestionChange={setSelectedQuestion}
@@ -1033,13 +1188,13 @@ export function App() {
             demoCounter={demoCounter}
             onRunDemo={handleRunDemo}
             onResetDemo={handleResetDemo}
-            onImport={(file) => void file.text().then((txt) => importPayload(txt, file.name))}
+            onImport={(file) => void handleWorkspaceFile(file)}
           />
         )}
         {view === "settings" && (
           <SettingsModule
-            openRouterConfig={openRouterConfig}
-            onOpenRouterChange={setOpenRouterConfig}
+            llmProfile={llmProfile}
+            onLLMProfileChange={setLlmProfile}
             registry={registry}
             previewProps={{
               preview,
