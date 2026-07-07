@@ -4,14 +4,15 @@ export async function sendAnalystQuery(
   config: LLMProfile,
   context: string,
 ): Promise<string> {
-  const baseUrl = config.baseUrl.replace(/\/$/, '');
-  const resp = await fetch(`${baseUrl}/chat/completions`, {
+  const baseUrl = config.baseUrl.replace(/\/+$/, '');
+  const resp = await fetch('/api/llm-proxy', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.key}`,
     },
     body: JSON.stringify({
+      baseUrl,
+      apiKey: config.key,
       model: config.model,
       messages: [
         {
@@ -21,12 +22,13 @@ export async function sendAnalystQuery(
         },
         { role: 'user', content: context },
       ],
-      max_tokens: 800,
+      maxTokens: 800,
     }),
   });
-  if (!resp.ok) throw new Error(`LLM profile error: ${resp.status}`);
   const data = (await resp.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    content?: string;
+    error?: string;
   };
-  return data.choices?.[0]?.message?.content ?? 'No response received.';
+  if (!resp.ok) throw new Error(data.error ?? `LLM profile error: ${resp.status}`);
+  return data.content ?? 'No response received.';
 }

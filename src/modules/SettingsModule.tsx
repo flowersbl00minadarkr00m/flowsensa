@@ -20,18 +20,27 @@ interface Props {
   previewProps: PreviewProps;
 }
 
-const TEMPLATE_JSON = `POST {baseUrl}/chat/completions
-Authorization: Bearer {apiKey}
+const TEMPLATE_JSON = `Browser request:
+POST /api/llm-proxy
 Content-Type: application/json
 
 {
+  "baseUrl": "<profile base URL>",
+  "apiKey": "<session key>",
   "model": "<profile model>",
   "messages": [
     { "role": "system", "content": "You are an advisory process intelligence assistant." },
     { "role": "user", "content": "<bounded process context + prompt>" }
   ],
-  "max_tokens": 800
-}`;
+  "maxTokens": 800
+}
+
+Server-side provider request:
+POST {baseUrl}/chat/completions
+Authorization: Bearer {apiKey}`;
+
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const OPENROUTER_MODEL = 'openai/gpt-4.1';
 
 export function SettingsModule({
   llmProfile,
@@ -71,6 +80,13 @@ export function SettingsModule({
     } finally {
       setTestLoading(false);
     }
+  }
+
+  function useOpenRouterPreset() {
+    setNameInput('My LLM profile');
+    setBaseUrlInput(OPENROUTER_BASE_URL);
+    setModelInput(OPENROUTER_MODEL);
+    setTestResult(null);
   }
 
   return (
@@ -120,6 +136,15 @@ export function SettingsModule({
             </div>
 
             <div className="button-row">
+              <button className="btn ghost" type="button" onClick={useOpenRouterPreset}>
+                Use OpenRouter preset
+              </button>
+              <span className="fine-print">
+                OpenRouter needs base URL {OPENROUTER_BASE_URL} and a model id like {OPENROUTER_MODEL}; "OpenRouter" by itself is not a model.
+              </span>
+            </div>
+
+            <div className="button-row">
               <button className="btn primary" type="button" disabled={!canSave} onClick={() => onLLMProfileChange(buildProfile())}>
                 Save and connect
               </button>
@@ -138,7 +163,7 @@ export function SettingsModule({
             <details className="request-disclosure">
               <summary>What gets sent to the selected LLM profile?</summary>
               <pre>{TEMPLATE_JSON}</pre>
-              <p>Your key is sent only in the Authorization header for explicit model actions. It is not written to source, IndexedDB, local storage, exports, or logs.</p>
+              <p>Your key is sent only for explicit model actions. It passes through the FlowSensa Vercel function and is forwarded to your selected provider; it is not written to source, IndexedDB, local storage, exports, or app logs.</p>
             </details>
           </div>
         )}

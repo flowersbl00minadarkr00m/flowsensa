@@ -4,8 +4,8 @@ export const DEFAULT_LLM_PROFILE: LLMProfile = {
   id: "default-openai-compatible",
   name: "My LLM profile",
   key: "",
-  baseUrl: "https://api.openai.com/v1",
-  model: "gpt-4.1",
+  baseUrl: "https://openrouter.ai/api/v1",
+  model: "openai/gpt-4.1",
 };
 
 export function isUsableLLMProfile(profile: LLMProfile | null | undefined): profile is LLMProfile {
