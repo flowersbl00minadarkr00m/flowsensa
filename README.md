@@ -1,73 +1,39 @@
 # FlowSensa
 
-Local-first process intelligence for human, agent, and system work. FlowSensa turns telemetry logs into process maps, task insights, process risks, enhancement suggestions, and exportable evidence.
+Turn work telemetry — from people, AI agents, and systems — into process maps, risks, and improvement suggestions you can check against evidence.
 
-## Getting Started
+[**Live demo**](https://flowsensa.vercel.app) · [Telemetry guide](docs/telemetry-log-guide.md) · [Architecture](docs/architecture.md)
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+![FlowSensa process map](docs/assets/hero.png)
+
+## Features
+
+- Process maps discovered from event logs, with confirmable steps and transitions
+- Process risks and enhancement suggestions, each tied to the evidence behind them
+- Resource usage, variants, and performance views across human, agent, and system work
+- Deterministic process-mining core — no model key required
+- Optional AI insights through your own OpenAI-compatible key (kept in memory, never stored)
+
+## Quick start
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Open http://localhost:5173 and click **Begin demo** to load a synthetic workspace — no key or data needed.
 
-## Demo Mode
+## Bring your own telemetry
 
-Click **Begin demo** to load the synthetic creator/project workspace. No API key is required.
+Import FlowSensa JSON work events, BPMN/XML process models, or process images. Optional sync from FindMnemo (formerly Mnemosync) is supported but never required — JSON import/export is always the escape hatch. Event schema, examples, and prompts: [telemetry guide](docs/telemetry-log-guide.md).
 
-The sample workspace includes post research, drafting, review, coding, tests, deployment, handoffs, retries, and human/agent/system activity.
+## Privacy
 
-## Bring Your Own Telemetry Log
+- Workspace data stays in your browser unless you explicitly import, sync, or export.
+- API keys live in session memory only — never in local storage, exports, or logs.
 
-Mnemosync can sync telemetry into FlowSensa, but it is not required. You can import:
+## License
 
-- FlowSensa JSON work-event collections
-- BPMN or XML process models
-- Process images for BYOK-assisted candidate extraction
-
-For the event schema, examples, prompts, and open source tooling options, see [docs/telemetry-log-guide.md](docs/telemetry-log-guide.md).
-
-At minimum, each event should identify:
-
-- the case or workflow instance;
-- the activity performed;
-- the actor (`human`, `agent`, `system`, `service-account`, or `external`);
-- optional tool/model context via `system.tool` and `system.model`;
-- result status and truth state;
-- provenance;
-- optional practical resources such as token counts, human time, compute, storage, network, or financial cost.
-
-Carbon, water, and energy/electricity resources are intentionally out of scope for this version.
-
-## AI Insights And BYOK
-
-The deterministic process-mining core works without a model key.
-
-Optional AI features use named OpenAI-compatible LLM profiles:
-
-1. Open **Settings -> LLM Profiles**.
-2. Name the profile so you know which provider/model it represents.
-3. Enter a base URL, model/deployment name, and API key.
-4. Use **Test connection** before asking AI Insights questions.
-
-Keys are kept in browser memory for the current session. They are not written to local storage, IndexedDB, exports, telemetry, logs, or the source bundle.
-
-## Storage Posture
-
-FlowSensa is local-first in the browser. Supabase-backed Mnemosync is useful for shared multi-agent telemetry, but FlowSensa should remain portable: JSON import/export is the escape hatch.
-
-If you want a stricter local-sovereignty setup, keep your telemetry log in SQLite or PGlite and export FlowSensa-compatible JSON when you want process analysis. Supabase remains a practical private-cloud option because the data can be migrated to self-hosted Postgres later.
-
-## NPM Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `npm run dev` | Vite dev server |
-| `npm run build` | TypeScript check + Vite build |
-| `npm run lint` | oxlint |
-| `npm test` | Vitest domain unit tests |
-| `npm run test:e2e` | Playwright end-to-end tests |
-
-## Architecture
-
-All workspace data stays local unless you explicitly sync from Mnemosync, import a file, invoke an LLM profile, or export a process map. See `docs/architecture.md` and `.ai/sdd/` for design artifacts.
+[MIT](LICENSE)
