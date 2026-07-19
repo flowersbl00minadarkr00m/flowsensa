@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  PERSONAL_ONTOLOGY_PROFILES,
+  validatePersonalOntologyBundle,
+} from "@henry/personal-ontology";
 import { answerQuestion } from "../src/domain/analyst";
 import { omitNullObjectProperties } from "../src/domain/adapters";
 import { discoverProcess } from "../src/domain/discovery";
@@ -33,6 +37,42 @@ import type {
 
 const validCollection = sampleFixture as WorkEventCollection;
 const validRegistry = primitiveFixture as PrimitiveRegistry;
+
+describe("personal ontology package", () => {
+  const validBundle = {
+    schemaVersion: "1.0.0",
+    bundleProfile: "flowsensa.process-analysis.v1",
+    bundleKind: "process-analysis",
+    producer: {
+      productName: "FlowSensa",
+      productId: "flowsensa",
+      exportedAt: "2026-07-09T00:00:00.000Z",
+    },
+    objects: [],
+    links: [],
+  };
+
+  it("exposes the three cross-product profiles", () => {
+    expect(PERSONAL_ONTOLOGY_PROFILES).toEqual([
+      "findmnemo.observed-work.v1",
+      "flowsensa.process-analysis.v1",
+      "sancussight.governance.v1",
+    ]);
+  });
+
+  it("accepts valid bundles and rejects malformed contract boundaries", () => {
+    expect(validatePersonalOntologyBundle(validBundle).valid).toBe(true);
+    expect(
+      validatePersonalOntologyBundle({ ...validBundle, schemaVersion: undefined }).valid,
+    ).toBe(false);
+    expect(
+      validatePersonalOntologyBundle({ ...validBundle, bundleProfile: "unknown.v1" }).valid,
+    ).toBe(false);
+    expect(
+      validatePersonalOntologyBundle({ ...validBundle, objects: {}, links: null }).valid,
+    ).toBe(false);
+  });
+});
 
 describe("schema boundaries", () => {
   it("normalizes null optional fields from SQL-backed telemetry exports", () => {

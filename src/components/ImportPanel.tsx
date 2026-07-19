@@ -41,7 +41,7 @@ export function ImportPanel({
           <button className="primary" type="button" onClick={onDemo}>Begin demo</button>
           <button type="button" onClick={() => inputRef.current?.click()}>Import process</button>
           <button type="button" onClick={onSync} disabled={syncing}>
-            {syncing ? "Syncing..." : "Sync with Mnemosync"}
+            {syncing ? "Syncing..." : "Sync with FindMnemo"}
           </button>
           <button className="text-button" type="button" onClick={onInvalidDemo}>Test error handling</button>
           <input

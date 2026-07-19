@@ -50,7 +50,7 @@ const TELEMETRY_ROWS = [
   },
 ];
 
-test("Sync with Mnemosync imports telemetry from the shared Supabase table", async ({ page }) => {
+test("Sync with FindMnemo imports telemetry from the shared Supabase table", async ({ page }) => {
   await page.route("**/rest/v1/telemetry_events*", (route) =>
     route.fulfill({
       status: 200,
@@ -61,7 +61,7 @@ test("Sync with Mnemosync imports telemetry from the shared Supabase table", asy
   );
 
   await page.goto("/");
-  await page.getByRole("button", { name: /Sync with Mnemosync/ }).first().click();
+  await page.getByRole("button", { name: /Sync with FindMnemo/ }).first().click();
 
   await expect(page.locator(".workspace-import-status")).toContainText("accepted, 0 rejected");
   await expect(page.getByText("Process Workspace")).toBeVisible();

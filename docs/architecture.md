@@ -4,7 +4,7 @@ Flowsensa is a consumer of the shared work-event contract.
 
 ```mermaid
 flowchart LR
-  M["Mnemosync export"] --> J["JSON telemetry adapter"]
+  M["FindMnemo export"] --> J["JSON telemetry adapter"]
   O["Future OTel adapter"] -.-> J
   J --> V["Runtime validation"]
   V --> E["Observed event store"]
@@ -19,7 +19,7 @@ flowchart LR
 
 ## Boundaries
 
-- Mnemosync owns capture and export.
+- FindMnemo owns capture and export.
 - Flowsensa owns process reconstruction, confirmation, responsibility analysis,
   and automation recommendations.
 - LocalCFO owns model usage, cost, and utility analysis in a separate project.

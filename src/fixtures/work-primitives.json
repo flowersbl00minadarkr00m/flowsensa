@@ -20,7 +20,7 @@
       "counterexamples": ["The person or agent temporarily assigned a queue item is automatically the accountable owner."],
       "relatedTerms": ["Approver", "Assignee", "Exception"],
       "validationRules": ["Every confirmed exception path must have one accountable owner."],
-      "consumers": ["Flowsensa", "Mnemosync"]
+      "consumers": ["Flowsensa", "FindMnemo"]
     },
     {
       "id": "primitive-approved-official",
@@ -42,7 +42,7 @@
       ],
       "relatedTerms": ["Validated", "Authority", "Evidence"],
       "validationRules": ["Approval requires a deciding authority, selected path, and evidence reference."],
-      "consumers": ["Flowsensa", "Mnemosync"]
+      "consumers": ["Flowsensa", "FindMnemo"]
     },
     {
       "id": "primitive-complete-operational",
@@ -64,7 +64,7 @@
       ],
       "relatedTerms": ["Accepted outcome", "Evidence", "Executed"],
       "validationRules": ["A completed case must contain at least one acceptedOutcome event."],
-      "consumers": ["Flowsensa", "Mnemosync"],
+      "consumers": ["Flowsensa", "FindMnemo"],
       "notes": "This operational definition may differ from a project-management system's generic done state."
     },
     {
@@ -87,7 +87,7 @@
       ],
       "relatedTerms": ["Owner", "Resolution path", "Escalation"],
       "validationRules": ["Every confirmed exception requires a reason code, owner, and resolution or escalation path."],
-      "consumers": ["Flowsensa", "Mnemosync"]
+      "consumers": ["Flowsensa", "FindMnemo"]
     },
     {
       "id": "primitive-approved-contested",

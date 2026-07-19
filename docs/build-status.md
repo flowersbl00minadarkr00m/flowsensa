@@ -3,7 +3,7 @@
 ## Current milestone
 
 Standalone process engineering MVP complete and integrated with canonical
-Mnemosync export.
+FindMnemo export.
 
 ## Complete
 
@@ -16,7 +16,7 @@ Mnemosync export.
   presentation.
 - Versioned JSON, Markdown, and Mermaid exports.
 - LocalCFO resource route and accounting logic removed.
-- Real Mnemosync download → Flowsensa upload browser integration test.
+- Real FindMnemo download â†’ Flowsensa upload browser integration test.
 
 ## Deliberately separate
 

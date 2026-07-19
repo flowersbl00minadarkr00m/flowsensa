@@ -11,5 +11,5 @@
 | Deterministic analyst | Domain and E2E tests cover all six Flowsensa questions |
 | Exports | Domain and E2E tests verify JSON round trip, Markdown, and Mermaid |
 | No LocalCFO route | Narrow-layout E2E asserts that Resources is absent |
-| Real producer integration | `tests/e2e/mnemosync-integration.spec.ts` downloads a real canonical Mnemosync export and imports it directly |
+| Real producer integration | `tests/e2e/findmnemo-integration.spec.ts` downloads a real canonical FindMnemo export and imports it directly |
 | Local privacy | E2E captures network requests and permits localhost only |

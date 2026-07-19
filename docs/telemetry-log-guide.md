@@ -1,6 +1,6 @@
 # Telemetry Log Guide
 
-FlowSensa works best when you give it a simple telemetry log: one event per meaningful step in a human, agent, or system workflow. Mnemosync is one source, but it is not required.
+FlowSensa works best when you give it a simple telemetry log: one event per meaningful step in a human, agent, or system workflow. FindMnemo is one source, but it is not required.
 
 ## Minimal Event Shape
 
@@ -112,4 +112,4 @@ Review this FlowSensa telemetry JSON before import. Find missing case IDs, out-o
 
 ## Storage Posture
 
-FlowSensa is local-first in the browser and can import a plain JSON log. Supabase-backed Mnemosync is useful for shared multi-agent telemetry, but it is not required. If you want to commit harder to local sovereignty, keep a SQLite or PGlite event log and export FlowSensa-compatible JSON when you want analysis.
+FlowSensa is local-first in the browser and can import a plain JSON log. Supabase-backed FindMnemo is useful for shared multi-agent telemetry, but it is not required. If you want to commit harder to local sovereignty, keep a SQLite or PGlite event log and export FlowSensa-compatible JSON when you want analysis.

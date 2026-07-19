@@ -1,12 +1,13 @@
 /**
  * Sync process telemetry from the Supabase `telemetry_events` table that
- * Flowsensa shares with Mnemosync. Rows are mapped into the canonical
+ * Flowsensa shares with FindMnemo. Rows are mapped into the canonical
  * WorkEvent schema (schema v1.0.0). The schema is strict
  * (additionalProperties: false), so every nested object is rebuilt from only
  * the fields the schema allows, and optional sub-objects are omitted unless
  * they satisfy their required shape — the import validator is the final gate.
  */
 import { supabase } from './supabase';
+import { validatePersonalOntologyBundle } from '@henry/personal-ontology';
 import type { WorkEventCollection } from '../domain/types';
 
 const ACTIVITY_TYPES = new Set([
@@ -34,6 +35,7 @@ type Row = Record<string, unknown>;
 const obj = (v: unknown): Row => (v && typeof v === 'object' ? (v as Row) : {});
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' && v ? v : fallback);
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
+const isRecord = (v: unknown): v is Row => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 
 function mapActivity(a: Row) {
   const activity: Row = {
@@ -196,6 +198,85 @@ function mapRow(row: Row) {
 export interface SyncResult {
   collection: WorkEventCollection;
   rowCount: number;
+  metadata: FindMnemoImportMetadata;
+}
+
+export interface FindMnemoImportMetadata {
+  producerName: 'FindMnemo';
+  producerId: 'findmnemo';
+  producerVersion?: string;
+  sourceTypes: string[];
+  compatibilityMode: 'findmnemo-current' | 'mnemosync-legacy-compatible';
+}
+
+function producerVersion(rows: Row[]): string | undefined {
+  for (const row of rows) {
+    const producer = obj(row.producer);
+    const version = str(row.producer_version, str(row.producerVersion, str(producer.version)));
+    if (version) return version;
+  }
+  return undefined;
+}
+
+/**
+ * Pure import seam used by Supabase sync and focused compatibility tests.
+ * Producer metadata stays beside the strict WorkEventCollection so the
+ * existing additionalProperties:false schema remains unchanged.
+ */
+export function createFindMnemoImport(
+  rows: Row[],
+  exportedAt = new Date().toISOString(),
+): SyncResult {
+  const collection = {
+    schemaVersion: '1.0.0',
+    exportedAt,
+    events: rows.map(mapRow),
+  } as unknown as WorkEventCollection;
+  const sourceTypes = [...new Set(collection.events.map((event) => event.provenance.sourceType))].sort();
+  const version = producerVersion(rows);
+  return {
+    collection,
+    rowCount: rows.length,
+    metadata: {
+      producerName: 'FindMnemo',
+      producerId: 'findmnemo',
+      ...(version ? { producerVersion: version } : {}),
+      sourceTypes,
+      compatibilityMode: sourceTypes.includes('mnemosync')
+        ? 'mnemosync-legacy-compatible'
+        : 'findmnemo-current',
+    },
+  };
+}
+
+export function formatFindMnemoImportLabel(result: SyncResult): string {
+  const countLabel = `${result.rowCount} event${result.rowCount === 1 ? '' : 's'}`;
+  const versionLabel = result.metadata.producerVersion
+    ? `; producer v${result.metadata.producerVersion}`
+    : '';
+  const compatibilityLabel = result.metadata.compatibilityMode === 'mnemosync-legacy-compatible'
+    ? '; legacy mnemosync-compatible'
+    : '; current producer metadata';
+  return `${result.metadata.producerName} sync (${countLabel}${versionLabel}${compatibilityLabel})`;
+}
+
+/**
+ * Personal-ontology bundles are not WorkEventCollection inputs in T2. Reject
+ * both malformed bundles and valid-but-unsupported profiles before App state
+ * can be replaced by the normal work-event import path.
+ */
+export function assertSupportedTelemetryImport(input: unknown): void {
+  if (!isRecord(input) || !('bundleProfile' in input)) return;
+  const validation = validatePersonalOntologyBundle(input);
+  if (!validation.valid) {
+    const detail = validation.issues[0];
+    throw new Error(
+      `Invalid personal ontology bundle${detail ? ` at ${detail.path}: ${detail.message}` : ''}.`,
+    );
+  }
+  throw new Error(
+    `${String(input.bundleProfile)} is not a work-event import. Import a validated FindMnemo WorkEventCollection instead.`,
+  );
 }
 
 /**
@@ -203,7 +284,7 @@ export interface SyncResult {
  * WorkEventCollection. Ordered by case then sequence/time so process discovery
  * sees coherent traces.
  */
-export async function syncFromMnemosync(): Promise<SyncResult> {
+export async function syncFromFindMnemo(): Promise<SyncResult> {
   const { data, error } = await supabase
     .from('telemetry_events')
     .select('*')
@@ -212,18 +293,12 @@ export async function syncFromMnemosync(): Promise<SyncResult> {
     .order('timestamp', { ascending: true });
 
   if (error) {
-    throw new Error(`Mnemosync sync failed: ${error.message}`);
+    throw new Error(`FindMnemo sync failed: ${error.message}`);
   }
   const rows = (data ?? []) as Row[];
   if (rows.length === 0) {
-    throw new Error('No telemetry events found in the shared Mnemosync table.');
+    throw new Error('No telemetry events found in the shared FindMnemo table.');
   }
 
-  const collection = {
-    schemaVersion: '1.0.0',
-    exportedAt: new Date().toISOString(),
-    events: rows.map(mapRow),
-  } as unknown as WorkEventCollection;
-
-  return { collection, rowCount: rows.length };
+  return createFindMnemoImport(rows);
 }
