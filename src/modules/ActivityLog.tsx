@@ -1,17 +1,28 @@
 import { useState } from 'react';
 import type { ActivityLogEntry } from '../domain/types';
 
+export interface EvidenceFilter {
+  eventIds: string[];
+  label: string;
+}
+
 interface Props {
   activityLog: ActivityLogEntry[];
   onOpenEvent: (id: string) => void;
+  /** Spec 006 R5: active drill-through filter set by evidence links elsewhere. */
+  evidenceFilter?: EvidenceFilter | null;
+  onClearEvidenceFilter?: () => void;
 }
 
-export function ActivityLog({ activityLog, onOpenEvent }: Props) {
+export function ActivityLog({ activityLog, onOpenEvent, evidenceFilter, onClearEvidenceFilter }: Props) {
   const [actorFilter, setActorFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [paused, setPaused] = useState(false);
 
+  const evidenceIds = evidenceFilter ? new Set(evidenceFilter.eventIds) : null;
+
   const filtered = activityLog.filter(row => {
+    if (evidenceIds && !evidenceIds.has(row.eventId)) return false;
     if (actorFilter && row.actorType !== actorFilter) return false;
     if (statusFilter && row.resultStatus !== statusFilter) return false;
     return true;
@@ -28,6 +39,18 @@ export function ActivityLog({ activityLog, onOpenEvent }: Props) {
         <h2>Activity Log</h2>
         <p>{activityLog.length} entries · {filtered.length} shown</p>
       </div>
+
+      {evidenceFilter && (
+        <div className="evidence-filter-banner" role="status">
+          <span>
+            Showing <strong>{filtered.length}</strong> evidence record{filtered.length === 1 ? '' : 's'} for:{' '}
+            <strong>{evidenceFilter.label}</strong>
+          </span>
+          <button className="btn ghost" type="button" onClick={onClearEvidenceFilter}>
+            Clear filter
+          </button>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="filter-bar">
@@ -62,7 +85,11 @@ export function ActivityLog({ activityLog, onOpenEvent }: Props) {
       {/* Table */}
       {displayed.length === 0 ? (
         <div className="empty-state">
-          <p>No activity log entries yet. Import events or run a demo activity.</p>
+          <p>
+            {evidenceFilter
+              ? 'None of the linked evidence records are in the current log. Clear the filter to see all entries.'
+              : 'No activity log entries yet. Import events or run a demo activity.'}
+          </p>
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -86,7 +113,7 @@ export function ActivityLog({ activityLog, onOpenEvent }: Props) {
               {displayed.map(row => (
                 <tr
                   key={row.eventId}
-                  className={`activity-log-row${row.isDemo ? ' is-demo' : ''}`}
+                  className={`activity-log-row${row.isDemo ? ' is-demo' : ''}${evidenceIds?.has(row.eventId) ? ' evidence-hit' : ''}`}
                 >
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
                     {new Date(row.ingestedAt).toLocaleTimeString()}

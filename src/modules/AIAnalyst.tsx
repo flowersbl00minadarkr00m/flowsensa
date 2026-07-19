@@ -20,6 +20,7 @@ interface Props {
   analystAnswer: AnalystAnswer;
   onQuestionChange: (q: string) => void;
   onOpenEvent: (id: string) => void;
+  onOpenEvidence: (eventIds: string[], label: string) => void;
 }
 
 const SUGGESTED_PROMPTS = [
@@ -66,6 +67,7 @@ export function AIAnalyst({
   analystAnswer,
   onQuestionChange,
   onOpenEvent,
+  onOpenEvidence,
 }: Props) {
   const [query, setQuery] = useState('');
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
@@ -103,7 +105,7 @@ export function AIAnalyst({
           <h3>Deterministic Analysis</h3>
           <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>No model - local evidence only</span>
         </div>
-        <AnalystView selectedQuestion={selectedQuestion} answer={analystAnswer} onQuestionChange={onQuestionChange} onOpenEvent={onOpenEvent} />
+        <AnalystView selectedQuestion={selectedQuestion} answer={analystAnswer} onQuestionChange={onQuestionChange} onOpenEvent={onOpenEvent} onOpenEvidence={onOpenEvidence} />
       </div>
 
       <div className="card">

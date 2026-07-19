@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ConfirmView } from '../components/ConfirmView';
+import { SwimlaneMap } from '../components/SwimlaneMap';
 import type {
   GraphEdge,
   GraphNode,
@@ -24,6 +25,7 @@ interface Props {
   onProcessRename: (name: string) => void;
   onTaskRename: (nodeId: string, name: string) => void;
   onExportMap: (format: 'JSON' | 'Markdown') => void;
+  onExportReport: () => void;
   onNodeChange: (id: string, patch: Partial<GraphNode>, rationale: string) => void;
   onEdgeChange: (id: string, patch: Partial<GraphEdge>, rationale: string) => void;
   onMerge: (src: string, tgt: string, rationale: string) => void;
@@ -46,94 +48,6 @@ function formatDuration(ms?: number): string {
   return `${Math.round(ms / 60_000)}m`;
 }
 
-function SVGGraph({
-  graph,
-  labelFor,
-  onSelectNode,
-  selectedNodeId,
-}: {
-  graph: ProcessGraph;
-  labelFor: (node: GraphNode) => string;
-  onSelectNode: (id: string) => void;
-  selectedNodeId: string | null;
-}) {
-  const NODE_W = 160;
-  const NODE_H = 64;
-  const COL_GAP = NODE_W + 60;
-  const ROW_GAP = NODE_H + 40;
-  const posMap = new Map<string, { x: number; y: number }>();
-  const MAX_PER_ROW = 5;
-  const sorted = [...graph.nodes];
-  sorted.forEach((node, i) => {
-    const col = i % MAX_PER_ROW;
-    const row = Math.floor(i / MAX_PER_ROW);
-    posMap.set(node.id, { x: col * COL_GAP + 30, y: row * ROW_GAP + 20 });
-  });
-
-  const totalRows = Math.ceil(sorted.length / MAX_PER_ROW);
-  const colsUsed = Math.min(sorted.length, MAX_PER_ROW);
-  const svgW = Math.max(colsUsed * COL_GAP + 60, 260);
-  const svgH = Math.max(totalRows * ROW_GAP + 40, 160);
-
-  return (
-    <div className="process-graph-scroll">
-      <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} aria-label="Process graph" role="img">
-        {graph.edges.map(edge => {
-          const from = posMap.get(edge.from);
-          const to = posMap.get(edge.to);
-          if (!from || !to) return null;
-          const x1 = from.x + NODE_W;
-          const y1 = from.y + NODE_H / 2;
-          const x2 = to.x;
-          const y2 = to.y + NODE_H / 2;
-          const cx = (x1 + x2) / 2;
-          return (
-            <path
-              key={edge.id}
-              d={`M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`}
-              fill="none"
-              stroke="var(--border-light)"
-              strokeWidth={1.5}
-            />
-          );
-        })}
-        {graph.nodes.map(node => {
-          const pos = posMap.get(node.id);
-          if (!pos) return null;
-          const isSelected = selectedNodeId === node.id;
-          const actorColor = node.actorTypes[0] ? (ACTOR_TYPE_COLORS[node.actorTypes[0]] ?? 'var(--text-muted)') : 'var(--text-muted)';
-          const label = labelFor(node);
-          const handleSelect = () => onSelectNode(node.id);
-          return (
-            <g
-              key={node.id}
-              className={`candidate-node${isSelected ? ' selected' : ''}`}
-              transform={`translate(${pos.x},${pos.y})`}
-              role="button"
-              tabIndex={0}
-              aria-label={`${label}, ${node.frequency} occurrences`}
-              onClick={handleSelect}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') handleSelect();
-              }}
-              onTouchEnd={handleSelect}
-            >
-              <rect width={NODE_W} height={NODE_H} rx={6} fill="var(--surface-2)" stroke={isSelected ? 'var(--accent)' : 'var(--border)'} strokeWidth={isSelected ? 2 : 1} />
-              <text x={NODE_W / 2} y={22} fill="var(--text)" fontSize={11} textAnchor="middle" fontFamily="var(--font-sans)" style={{ pointerEvents: 'none' }}>
-                {label.length > 18 ? `${label.slice(0, 16)}...` : label}
-              </text>
-              <text x={NODE_W / 2} y={38} fill="var(--text-muted)" fontSize={9} textAnchor="middle" fontFamily="var(--font-mono)" style={{ pointerEvents: 'none' }}>
-                n={node.frequency}
-              </text>
-              <rect x={0} y={46} width={NODE_W} height={6} rx={0} fill={actorColor} opacity={0.7} />
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
 export function ProcessExplorer({
   graph,
   inferredGraph,
@@ -146,6 +60,7 @@ export function ProcessExplorer({
   onProcessRename,
   onTaskRename,
   onExportMap,
+  onExportReport,
   onNodeChange,
   onEdgeChange,
   onMerge,
@@ -207,6 +122,9 @@ export function ProcessExplorer({
         <button className="btn ghost" type="button" onClick={() => onExportMap('JSON')} disabled={!graph}>
           Export JSON
         </button>
+        <button className="btn" type="button" onClick={onExportReport} disabled={!graph}>
+          Export report
+        </button>
       </div>
 
       <div className="process-workspace-body">
@@ -229,7 +147,7 @@ export function ProcessExplorer({
             <div className="process-map-layout">
               <div className="process-map-card">
                 {graph && graph.nodes.length > 0 ? (
-                  <SVGGraph graph={graph} labelFor={labelFor} onSelectNode={setSelectedNodeId} selectedNodeId={selectedNodeId} />
+                  <SwimlaneMap graph={graph} labelFor={labelFor} onSelectNode={setSelectedNodeId} selectedNodeId={selectedNodeId} />
                 ) : (
                   <div className="empty-state"><p>No process data available. Import events first.</p></div>
                 )}
@@ -237,6 +155,8 @@ export function ProcessExplorer({
                   {Object.entries(ACTOR_TYPE_COLORS).map(([k, c]) => (
                     <span key={k}><i style={{ background: c }} />{k}</span>
                   ))}
+                  <span><i style={{ background: 'var(--accent)' }} />critical path</span>
+                  <span><i style={{ background: 'var(--danger)' }} />high fail/retry</span>
                 </div>
               </div>
 

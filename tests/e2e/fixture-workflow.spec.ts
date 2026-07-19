@@ -99,5 +99,5 @@ test("an imported valid file replaces the showcase locally", async ({ page }) =>
   // Imported non-sample data drops the synthetic sample marker from the header.
   await expect(page.getByText("Process Workspace")).toBeVisible();
   await expect(page.getByText("Synthetic sample data loaded locally", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Sync with Mnemosync" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sync with FindMnemo" })).toBeVisible();
 });

@@ -1,8 +1,11 @@
 import type { ResourceUsageSummary, ResourceDriverRow, ModelUsageRow } from "../domain/resourceUsage";
+import type { WorkEvent } from "../domain/types";
+import { BreakevenPanel } from "./BreakevenPanel";
 
 interface Props {
   usage: ResourceUsageSummary;
-  onOpenEvent: (id: string) => void;
+  events: WorkEvent[];
+  onOpenEvidence: (eventIds: string[], label: string) => void;
 }
 
 function formatNumber(value: number): string {
@@ -22,12 +25,19 @@ function formatMinutes(actual: number, estimated: number): string {
   return `${formatNumber(total)}m`;
 }
 
-function EvidenceButton({ eventIds, onOpenEvent }: { eventIds: string[]; onOpenEvent: (id: string) => void }) {
-  const firstEvent = eventIds[0];
-  if (!firstEvent) return <span style={{ color: "var(--text-dim)" }}>-</span>;
+function EvidenceButton({
+  eventIds,
+  label,
+  onOpenEvidence,
+}: {
+  eventIds: string[];
+  label: string;
+  onOpenEvidence: (eventIds: string[], label: string) => void;
+}) {
+  if (!eventIds.length) return <span style={{ color: "var(--text-dim)" }}>-</span>;
   return (
-    <button className="btn ghost" type="button" style={{ padding: 0, fontSize: "0.72rem" }} onClick={() => onOpenEvent(firstEvent)}>
-      Open evidence
+    <button className="btn ghost" type="button" style={{ padding: 0, fontSize: "0.72rem" }} onClick={() => onOpenEvidence(eventIds, label)}>
+      Evidence ({eventIds.length}) →
     </button>
   );
 }
@@ -45,12 +55,12 @@ function DriverTable({
   title,
   subtitle,
   rows,
-  onOpenEvent,
+  onOpenEvidence,
 }: {
   title: string;
   subtitle: string;
   rows: ResourceDriverRow[];
-  onOpenEvent: (id: string) => void;
+  onOpenEvidence: (eventIds: string[], label: string) => void;
 }) {
   return (
     <div className="card" style={{ marginBottom: "1.2rem" }}>
@@ -85,7 +95,7 @@ function DriverTable({
                   <td style={{ fontFamily: "var(--font-mono)" }}>{formatCost(row.cost.actual, row.cost.estimated)}</td>
                   <td style={{ fontFamily: "var(--font-mono)" }}>{formatMinutes(row.humanTimeMinutes.actual, row.humanTimeMinutes.estimated)}</td>
                   <td><ConfidenceBreakdown row={row} /></td>
-                  <td><EvidenceButton eventIds={row.eventIds} onOpenEvent={onOpenEvent} /></td>
+                  <td><EvidenceButton eventIds={row.eventIds} label={row.label} onOpenEvidence={onOpenEvidence} /></td>
                 </tr>
               ))}
             </tbody>
@@ -96,7 +106,7 @@ function DriverTable({
   );
 }
 
-function ModelTable({ rows, onOpenEvent }: { rows: ModelUsageRow[]; onOpenEvent: (id: string) => void }) {
+function ModelTable({ rows, onOpenEvidence }: { rows: ModelUsageRow[]; onOpenEvidence: (eventIds: string[], label: string) => void }) {
   return (
     <div className="card" style={{ marginBottom: "1.2rem" }}>
       <div className="card-header">
@@ -135,7 +145,7 @@ function ModelTable({ rows, onOpenEvent }: { rows: ModelUsageRow[]; onOpenEvent:
                   <td style={{ fontFamily: "var(--font-mono)" }}>{formatNumber(row.tokens.actual + row.tokens.estimated)}</td>
                   <td style={{ fontFamily: "var(--font-mono)" }}>{formatCost(row.cost.actual, row.cost.estimated)}</td>
                   <td><ConfidenceBreakdown row={row} /></td>
-                  <td><EvidenceButton eventIds={row.eventIds} onOpenEvent={onOpenEvent} /></td>
+                  <td><EvidenceButton eventIds={row.eventIds} label={row.model ?? row.label} onOpenEvidence={onOpenEvidence} /></td>
                 </tr>
               ))}
             </tbody>
@@ -146,7 +156,7 @@ function ModelTable({ rows, onOpenEvent }: { rows: ModelUsageRow[]; onOpenEvent:
   );
 }
 
-export function ResourceUsage({ usage, onOpenEvent }: Props) {
+export function ResourceUsage({ usage, events, onOpenEvidence }: Props) {
   const resourceCoverage = usage.totalEvents ? Math.round((usage.resourceEventCount / usage.totalEvents) * 100) : 0;
   const llmCoverage = usage.agentOrModelEventCount
     ? Math.round(((usage.agentOrModelEventCount - usage.agentOrModelMissingResourceCount) / usage.agentOrModelEventCount) * 100)
@@ -186,10 +196,12 @@ export function ResourceUsage({ usage, onOpenEvent }: Props) {
         <strong>Telemetry quality:</strong> {usage.agentOrModelMissingResourceCount} of {usage.agentOrModelEventCount} agent/model events are missing token or cost resources. LLM coverage is {llmCoverage}%.
       </div>
 
-      <ModelTable rows={usage.byModel.slice(0, 8)} onOpenEvent={onOpenEvent} />
-      <DriverTable title="Top resource-driving tasks" subtitle="Tasks ranked by tokens, cost, and human time" rows={usage.byTask.slice(0, 10)} onOpenEvent={onOpenEvent} />
-      <DriverTable title="Case totals" subtitle="Resource usage by process case" rows={usage.byCase.slice(0, 10)} onOpenEvent={onOpenEvent} />
-      <DriverTable title="Actor type totals" subtitle="Human, agent, system, and external resource split" rows={usage.byActorType} onOpenEvent={onOpenEvent} />
+      <BreakevenPanel events={events} />
+
+      <ModelTable rows={usage.byModel.slice(0, 8)} onOpenEvidence={onOpenEvidence} />
+      <DriverTable title="Top resource-driving tasks" subtitle="Tasks ranked by tokens, cost, and human time" rows={usage.byTask.slice(0, 10)} onOpenEvidence={onOpenEvidence} />
+      <DriverTable title="Case totals" subtitle="Resource usage by process case" rows={usage.byCase.slice(0, 10)} onOpenEvidence={onOpenEvidence} />
+      <DriverTable title="Actor type totals" subtitle="Human, agent, system, and external resource split" rows={usage.byActorType} onOpenEvidence={onOpenEvidence} />
     </div>
   );
 }

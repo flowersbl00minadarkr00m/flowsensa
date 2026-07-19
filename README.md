@@ -15,6 +15,8 @@ Turn work telemetry — from people, AI agents, and systems — into process map
 - Resource usage, variants, and performance views across human, agent, and system work
 - Deterministic process-mining core — no model key required
 - Optional AI insights through your own OpenAI-compatible key (kept in memory, never stored)
+- Sourcing breakeven: pay-per-token vs pay-per-compute from your own telemetry
+- Exportable process report — a self-contained HTML one-pager, no external requests
 
 ## Quick start
 

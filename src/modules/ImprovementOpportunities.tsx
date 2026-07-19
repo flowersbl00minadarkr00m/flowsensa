@@ -9,6 +9,7 @@ interface Props {
   gaps: Gap[];
   onRecommendationChange: (id: string, cls: RecommendationClass) => void;
   onOpenEvent: (id: string) => void;
+  onOpenEvidence: (eventIds: string[], label: string) => void;
 }
 
 type Family = 'Automation' | 'LLM' | 'Hybrid' | 'Keep Manual' | 'Insufficient evidence';
@@ -233,7 +234,7 @@ ${rec.uncertainty}
 `;
 }
 
-function MnemosyncModal({ rec, onClose }: { rec: Recommendation; onClose: () => void }) {
+function FindMnemoModal({ rec, onClose }: { rec: Recommendation; onClose: () => void }) {
   const text = `flowsensa-improvement
 node: ${rec.nodeId}
 recommendation: ${rec.recommendationClass}
@@ -244,8 +245,8 @@ evidence: ${rec.evidenceEventIds.slice(0, 3).join(', ')}
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-        <h3>Track in Mnemosync</h3>
-        <p>Copy this explicit handoff into your Mnemosync workspace. Flowsensa will not write to another product silently.</p>
+        <h3>Track in FindMnemo</h3>
+        <p>Copy this explicit handoff into your FindMnemo workspace. Flowsensa will not write to another product silently.</p>
         <pre>{text}</pre>
         <div className="button-row">
           <button className="btn primary" type="button" onClick={() => { void navigator.clipboard.writeText(text); }}>
@@ -264,11 +265,12 @@ export function ImprovementOpportunities({
   gaps,
   onRecommendationChange,
   onOpenEvent,
+  onOpenEvidence,
 }: Props) {
   const [familyFilter, setFamilyFilter] = useState<Family | ''>('');
   const [minConfidence, setMinConfidence] = useState(0);
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
-  const [mnemosyncRec, setMnemosyncRec] = useState<Recommendation | null>(null);
+  const [findMnemoRec, setFindMnemoRec] = useState<Recommendation | null>(null);
   const confirmedNodes = nodes.filter((node) => node.status === 'confirmed').length;
   const recommendationsAreProvisional = confirmedNodes === 0;
 
@@ -438,7 +440,12 @@ export function ImprovementOpportunities({
                 {rec.evidenceEventIds.length > 0 && (
                   <div className="evidence-block">
                     <span>Evidence events ({rec.evidenceEventIds.length})</span>
-                    <EvidenceLinks eventIds={rec.evidenceEventIds} onOpenEvent={onOpenEvent} />
+                    <EvidenceLinks
+                      eventIds={rec.evidenceEventIds}
+                      onOpenEvent={onOpenEvent}
+                      onOpenEvidence={onOpenEvidence}
+                      evidenceLabel={`${node?.label ?? rec.nodeId} enhancement`}
+                    />
                   </div>
                 )}
 
@@ -459,8 +466,8 @@ export function ImprovementOpportunities({
                   >
                     Generate brief
                   </button>
-                  <button className="btn ghost" type="button" onClick={() => setMnemosyncRec(rec)}>
-                    Track in Mnemosync
+                  <button className="btn ghost" type="button" onClick={() => setFindMnemoRec(rec)}>
+                    Track in FindMnemo
                   </button>
                   <button
                     className="btn ghost"
@@ -492,15 +499,20 @@ export function ImprovementOpportunities({
                   <strong>{gap.type}</strong>
                   <p>{gap.message}</p>
                 </div>
-                <EvidenceLinks eventIds={gap.eventIds} onOpenEvent={onOpenEvent} />
+                <EvidenceLinks
+                  eventIds={gap.eventIds}
+                  onOpenEvent={onOpenEvent}
+                  onOpenEvidence={onOpenEvidence}
+                  evidenceLabel={`${gap.type} gap`}
+                />
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {mnemosyncRec && (
-        <MnemosyncModal rec={mnemosyncRec} onClose={() => setMnemosyncRec(null)} />
+      {findMnemoRec && (
+        <FindMnemoModal rec={findMnemoRec} onClose={() => setFindMnemoRec(null)} />
       )}
     </div>
   );

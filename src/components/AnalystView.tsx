@@ -7,6 +7,7 @@ interface AnalystViewProps {
   answer: AnalystAnswer;
   onQuestionChange: (questionId: string) => void;
   onOpenEvent: (eventId: string) => void;
+  onOpenEvidence?: (eventIds: string[], label: string) => void;
 }
 
 export function AnalystView({
@@ -14,6 +15,7 @@ export function AnalystView({
   answer,
   onQuestionChange,
   onOpenEvent,
+  onOpenEvidence,
 }: AnalystViewProps) {
   return (
     <section aria-labelledby="analyst-title">
@@ -53,6 +55,8 @@ export function AnalystView({
                 <EvidenceLinks
                   eventIds={evidence.eventIds}
                   onOpenEvent={onOpenEvent}
+                  onOpenEvidence={onOpenEvidence}
+                  evidenceLabel={evidence.label}
                 />
               </li>
             ))}

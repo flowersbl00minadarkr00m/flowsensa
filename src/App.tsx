@@ -43,6 +43,7 @@ import { buildTaskInsights } from "./domain/processInsights";
 import { createDefaultProcessMetadata } from "./domain/processMetadata";
 import { buildProcessRisks } from "./domain/processRisks";
 import { buildResourceUsage } from "./domain/resourceUsage";
+import { exportProcessReport } from "./lib/reportExport";
 import { createImageProcessExtractionRequest } from "./domain/imageProcessImport";
 import type {
   FlowExport,
@@ -64,7 +65,11 @@ import {
 } from "./domain/validation";
 import primitiveFixture from "./fixtures/work-primitives.json";
 import { showcaseWorkEvents } from "./fixtures/showcase-work-events";
-import { syncFromMnemosync } from "./lib/mnemosyncSync";
+import {
+  assertSupportedTelemetryImport,
+  formatFindMnemoImportLabel,
+  syncFromFindMnemo,
+} from "./lib/findMnemoTelemetry";
 
 type View =
   | "overview"
@@ -183,11 +188,22 @@ export function App() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [importSummary, setImportSummary] = useState<string>();
+  // Spec 006 R1/TD-001: notice-strip dismissal persists outside src/domain.
+  const [noticesDismissed, setNoticesDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("flowsensa.noticesDismissed.v1") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [selectedEventId, setSelectedEventId] = useState<string>();
   const [selectedQuestion, setSelectedQuestion] = useState("elapsed");
   const [previewType, setPreviewType] = useState<"JSON" | "Markdown" | "Mermaid">("JSON");
   const [hydrated, setHydrated] = useState(false);
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  // Spec 006 R5: evidence drill-through — links elsewhere open the Evidence
+  // Log filtered to their supporting records.
+  const [evidenceFilter, setEvidenceFilter] = useState<{ eventIds: string[]; label: string } | null>(null);
   const [llmProfile, setLlmProfile] = useState<LLMProfile | null>(null);
   const [processMetadata, setProcessMetadata] = useState<ProcessMetadata>();
   const [demoCounter, setDemoCounter] = useState(0);
@@ -348,10 +364,16 @@ export function App() {
     closeMoreSheet();
   }
 
+  function openEvidence(eventIds: string[], label: string) {
+    setEvidenceFilter({ eventIds, label });
+    setView("activity");
+  }
+
   // importPayload declared before handleRunDemo so we can reference it
   const importPayload = useCallback(async (payload: unknown, label: string) => {
     try {
       const parsed = await adapter.import(payload);
+      assertSupportedTelemetryImport(parsed);
       const eventResult = validateWorkEvents(parsed);
       const primitiveResult = validatePrimitiveRegistry(primitiveFixture);
       if (!eventResult.valid || !eventResult.data) {
@@ -431,12 +453,12 @@ export function App() {
     await importPayload(text, file.name);
   }, [importPayload, llmProfile]);
 
-  const handleSyncMnemosync = useCallback(async () => {
+  const handleSyncFindMnemo = useCallback(async () => {
     setSyncing(true);
-    setImportSummary("Syncing telemetry from Mnemosync…");
+    setImportSummary("Syncing telemetry from FindMnemo...");
     try {
-      const { collection, rowCount } = await syncFromMnemosync();
-      await importPayload(collection, `Mnemosync sync (${rowCount} events)`);
+      const result = await syncFromFindMnemo();
+      await importPayload(result.collection, formatFindMnemoImportLabel(result));
     } catch (error) {
       setImportSummary((error as Error).message);
     } finally {
@@ -702,7 +724,7 @@ export function App() {
           ...edge,
           from,
           to,
-          id: `${from}→${to}`,
+          id: `${from}â†’${to}`,
           truthState: edge.from === sourceId || edge.to === sourceId ? "overridden" as const : edge.truthState,
         };
       });
@@ -828,6 +850,18 @@ export function App() {
       "text/markdown",
     );
   }, [graph, processMetadata, taskInsights]);
+
+  const handleExportReport = useCallback(() => {
+    if (!graph || !processMetadata) return;
+    exportProcessReport({
+      metadata: processMetadata,
+      graph,
+      kpis,
+      risks: processRisks,
+      recommendations,
+      usage: resourceUsage,
+    });
+  }, [graph, processMetadata, kpis, processRisks, recommendations, resourceUsage]);
 
   const handleClear = useCallback(async () => {
     await clearWorkspace();
@@ -982,7 +1016,7 @@ export function App() {
           type="button"
           onClick={moreSheetOpen ? closeMoreSheet : openMoreSheet}
         >
-          <span className="bottom-tab-icon" aria-hidden="true">⋯</span>
+          <span className="bottom-tab-icon" aria-hidden="true">â‹¯</span>
           More
         </button>
       </nav>
@@ -1057,10 +1091,29 @@ export function App() {
               ☰
             </button>
             <div>
-              <strong>Process Workspace</strong>
+              <strong>
+                Process Workspace
+                {isShowcase && noticesDismissed && (
+                  <button
+                    className="status-chip"
+                    type="button"
+                    style={{ marginLeft: "0.5rem", cursor: "pointer" }}
+                    title="Sample data loaded — click for details"
+                    onClick={() => {
+                      setNoticesDismissed(false);
+                      try {
+                        localStorage.removeItem("flowsensa.noticesDismissed.v1");
+                      } catch {
+                        // best-effort persistence
+                      }
+                    }}
+                  >
+                    Sample data
+                  </button>
+                )}
+              </strong>
               <span>
                 {events.events.length} events · {graph.nodes.length} steps · schema v{events.schemaVersion}
-                {isShowcase ? " · Synthetic sample data loaded locally" : ""}
               </span>
             </div>
           </div>
@@ -1072,10 +1125,10 @@ export function App() {
               className="btn primary"
               style={{ fontSize: "0.72rem", padding: "0.3rem 0.7rem" }}
               type="button"
-              onClick={() => void handleSyncMnemosync()}
+              onClick={() => void handleSyncFindMnemo()}
               disabled={syncing}
             >
-              {syncing ? "Syncing…" : "Sync with Mnemosync"}
+              {syncing ? "Syncing..." : "Sync with FindMnemo"}
             </button>
             <button
               className="btn ghost"
@@ -1107,20 +1160,40 @@ export function App() {
             <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem" }}>{issues[0]?.eventId}: {issues[0]?.field} — {issues[0]?.reason}</code>
           </div>
         )}
-        {!issues.length && importSummary && (
-          <div className="workspace-import-status" role="status">
-            {importSummary}
-          </div>
-        )}
-        {isShowcase && (
-          <div className="sample-data-banner" role="status">
-            <div>
-              <strong>Synthetic sample data loaded locally</strong>
-              <span>This browser is showing bundled demo events, not shared production data. Import your own telemetry to replace it.</span>
+        {!issues.length && (importSummary || isShowcase) && !noticesDismissed && (
+          <div className="workspace-import-status" role="status" style={{ display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 20rem", minWidth: 0 }}>
+              {importSummary && <span>{importSummary}</span>}
+              {isShowcase && (
+                <>
+                  {importSummary ? " " : ""}
+                  <strong>Synthetic sample data loaded locally</strong>
+                  <span> — bundled demo events, not shared production data. Import your own telemetry to replace it.</span>
+                </>
+              )}
             </div>
-            <button className="btn primary" type="button" onClick={() => void handleClearSampleAndImport()}>
-              Clear sample and import your telemetry
-            </button>
+            <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+              {isShowcase && (
+                <button className="btn primary" type="button" style={{ fontSize: "0.72rem" }} onClick={() => void handleClearSampleAndImport()}>
+                  Clear sample and import your telemetry
+                </button>
+              )}
+              <button
+                className="btn ghost"
+                type="button"
+                style={{ fontSize: "0.72rem" }}
+                onClick={() => {
+                  setNoticesDismissed(true);
+                  try {
+                    localStorage.setItem("flowsensa.noticesDismissed.v1", "1");
+                  } catch {
+                    // best-effort persistence
+                  }
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
@@ -1149,6 +1222,7 @@ export function App() {
             onProcessRename={handleProcessRename}
             onTaskRename={handleTaskRename}
             onExportMap={handleProcessMapExport}
+            onExportReport={handleExportReport}
             onNodeChange={handleNodeChange}
             onEdgeChange={handleEdgeChange}
             onMerge={handleMerge}
@@ -1163,16 +1237,22 @@ export function App() {
             risks={processRisks}
             llmProfile={llmProfile}
             onOpenEvent={setSelectedEventId}
+            onOpenEvidence={openEvidence}
           />
         )}
         {view === "variants" && (
           <ProcessVariants graph={graph} events={events.events} />
         )}
         {view === "activity" && (
-          <ActivityLog activityLog={activityLog} onOpenEvent={setSelectedEventId} />
+          <ActivityLog
+            activityLog={activityLog}
+            onOpenEvent={setSelectedEventId}
+            evidenceFilter={evidenceFilter}
+            onClearEvidenceFilter={() => setEvidenceFilter(null)}
+          />
         )}
         {view === "resources" && (
-          <ResourceUsage usage={resourceUsage} onOpenEvent={setSelectedEventId} />
+          <ResourceUsage usage={resourceUsage} events={events.events} onOpenEvidence={openEvidence} />
         )}
         {view === "performance" && (
           <PerformanceAnalysis graph={graph} events={events.events} kpis={kpis} />
@@ -1184,6 +1264,7 @@ export function App() {
             gaps={gaps}
             onRecommendationChange={handleRecommendationChange}
             onOpenEvent={setSelectedEventId}
+            onOpenEvidence={openEvidence}
           />
         )}
         {view === "alerts" && (
@@ -1210,6 +1291,7 @@ export function App() {
             analystAnswer={analystAnswer}
             onQuestionChange={setSelectedQuestion}
             onOpenEvent={setSelectedEventId}
+            onOpenEvidence={openEvidence}
           />
         )}
         {view === "sources" && (
