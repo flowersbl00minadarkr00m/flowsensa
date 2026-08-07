@@ -1,6 +1,7 @@
 import type { ProcessGraph, WorkEvent } from "../domain/types";
 import { EvidenceLinks } from "./EvidenceLinks";
 import { TruthBadge } from "./TruthBadge";
+import { pluralize } from "../lib/plural";
 
 interface ObserveViewProps {
   graph: ProcessGraph;
@@ -125,7 +126,7 @@ export function ObserveView({ graph, events, onOpenEvent }: ObserveViewProps) {
                   <TruthBadge state={node.truthState} />
                 </div>
                 <p>
-                  <code>{node.id}</code> · {node.frequency} events · {node.actorTypes.join(", ")}
+                  <code>{node.id}</code> · {pluralize(node.frequency, "event")} · {node.actorTypes.join(", ")}
                 </p>
                 <p>
                   {node.repeats} repeats · {node.exceptions} exceptions · {node.acceptedOutcomes} accepted outcomes

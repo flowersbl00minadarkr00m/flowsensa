@@ -1,6 +1,8 @@
 import type { ResourceUsageSummary, ResourceDriverRow, ModelUsageRow } from "../domain/resourceUsage";
 import type { WorkEvent } from "../domain/types";
 import { BreakevenPanel } from "./BreakevenPanel";
+import { pluralize } from "../lib/plural";
+import { StatCard, StatGrid } from "../components/StatCard";
 
 interface Props {
   usage: ResourceUsageSummary;
@@ -169,28 +171,28 @@ export function ResourceUsage({ usage, events, onOpenEvidence }: Props) {
         <p>Token, cost, and human-time telemetry for the selected process. Actual logged values stay separate from estimates.</p>
       </div>
 
-      <div className="kpi-strip" style={{ gap: "1rem", marginBottom: "1.5rem" }}>
-        <div className="kpi-card">
-          <span className="kpi-label">Token Usage</span>
-          <span className="kpi-value" style={{ fontSize: "1.7rem" }}>{formatNumber(usage.overallTokens.actual + usage.overallTokens.estimated)}</span>
-          <span className="kpi-sublabel">{formatNumber(usage.overallTokens.actual)} actual · {formatNumber(usage.overallTokens.estimated)} estimated</span>
-        </div>
-        <div className="kpi-card">
-          <span className="kpi-label">Cost</span>
-          <span className="kpi-value" style={{ fontSize: "1.7rem" }}>{formatCost(usage.overallCost.actual, usage.overallCost.estimated)}</span>
-          <span className="kpi-sublabel">${usage.overallCost.actual.toFixed(2)} actual · ${usage.overallCost.estimated.toFixed(2)} estimated</span>
-        </div>
-        <div className="kpi-card">
-          <span className="kpi-label">Human Time</span>
-          <span className="kpi-value" style={{ fontSize: "1.7rem" }}>{formatMinutes(usage.overallHumanTimeMinutes.actual, usage.overallHumanTimeMinutes.estimated)}</span>
-          <span className="kpi-sublabel">{formatNumber(usage.overallHumanTimeMinutes.actual)}m actual · {formatNumber(usage.overallHumanTimeMinutes.estimated)}m estimated</span>
-        </div>
-        <div className="kpi-card">
-          <span className="kpi-label">Coverage</span>
-          <span className="kpi-value" style={{ fontSize: "1.7rem" }}>{resourceCoverage}%</span>
-          <span className="kpi-sublabel">{usage.resourceEventCount} of {usage.totalEvents} events include resources</span>
-        </div>
-      </div>
+      <StatGrid>
+        <StatCard
+          label="Token Usage"
+          value={formatNumber(usage.overallTokens.actual + usage.overallTokens.estimated)}
+          sublabel={`${formatNumber(usage.overallTokens.actual)} actual · ${formatNumber(usage.overallTokens.estimated)} estimated`}
+        />
+        <StatCard
+          label="Cost"
+          value={formatCost(usage.overallCost.actual, usage.overallCost.estimated)}
+          sublabel={`$${usage.overallCost.actual.toFixed(2)} actual · $${usage.overallCost.estimated.toFixed(2)} estimated`}
+        />
+        <StatCard
+          label="Human Time"
+          value={formatMinutes(usage.overallHumanTimeMinutes.actual, usage.overallHumanTimeMinutes.estimated)}
+          sublabel={`${formatNumber(usage.overallHumanTimeMinutes.actual)}m actual · ${formatNumber(usage.overallHumanTimeMinutes.estimated)}m estimated`}
+        />
+        <StatCard
+          label="Coverage"
+          value={`${resourceCoverage}%`}
+          sublabel={`${usage.resourceEventCount} of ${pluralize(usage.totalEvents, "event")} include resources`}
+        />
+      </StatGrid>
 
       <div className="workspace-import-status" role="status" style={{ marginBottom: "1.2rem" }}>
         <strong>Telemetry quality:</strong> {usage.agentOrModelMissingResourceCount} of {usage.agentOrModelEventCount} agent/model events are missing token or cost resources. LLM coverage is {llmCoverage}%.

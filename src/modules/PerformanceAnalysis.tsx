@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { KPISnapshot, ProcessGraph, WorkEvent } from '../domain/types';
+import { pluralize } from '../lib/plural';
+import { StatCard, StatGrid } from '../components/StatCard';
 
 interface Props {
   graph?: ProcessGraph;
@@ -19,13 +21,12 @@ function formatDuration(ms: number): string {
   return `${s}s`;
 }
 
-// Simple representative sparkline path (hardcoded shape for visual polish)
-const SPARKLINE_PATHS: Record<string, string> = {
-  cases: 'M0,30 L10,25 L20,20 L30,22 L40,15 L50,18 L60,10 L70,12 L80,8',
-  throughput: 'M0,25 L10,28 L20,22 L30,24 L40,18 L50,20 L60,15 L70,14 L80,16',
-  exception: 'M0,10 L10,14 L20,12 L30,20 L40,18 L50,22 L60,25 L70,24 L80,28',
-  automation: 'M0,30 L10,28 L20,24 L30,20 L40,18 L50,14 L60,12 L70,10 L80,8',
-};
+// Spec 010 FR-008: the four hardcoded sparkline paths that used to live here
+// were decorative — every card got the same invented shape regardless of its
+// data, so a 0% Automation Coverage metric rendered next to a rising trend
+// line. There is no per-KPI time series in the model, so the sparklines are
+// omitted rather than faked. Reinstate them only with a real series and an
+// explicit window label (e.g. "last 30d") via <StatCard spark=…>.
 
 export function PerformanceAnalysis({ graph, events, kpis }: Props) {
   const [period, setPeriod] = useState<Period>('all');
@@ -50,28 +51,24 @@ export function PerformanceAnalysis({ graph, events, kpis }: Props) {
       label: 'Cases Observed',
       value: String(kpis.caseCount),
       sub: 'Unique case IDs',
-      sparkKey: 'cases',
     },
     {
       key: 'throughput',
       label: 'Median Throughput',
       value: formatDuration(kpis.medianThroughputMs),
       sub: 'End-to-end per case',
-      sparkKey: 'throughput',
     },
     {
       key: 'exception',
       label: 'Exception Rate',
       value: `${(kpis.exceptionRate * 100).toFixed(1)}%`,
       sub: 'Failures / retries',
-      sparkKey: 'exception',
     },
     {
       key: 'automation',
       label: 'Automation Coverage',
       value: `${(kpis.automationCoverageRate * 100).toFixed(0)}%`,
       sub: 'Confirmed nodes',
-      sparkKey: 'automation',
     },
   ];
 
@@ -81,7 +78,7 @@ export function PerformanceAnalysis({ graph, events, kpis }: Props) {
         <div className="module-heading" style={{ marginBottom: 0 }}>
           <h2>Performance Analysis</h2>
           <p>
-            {filteredEvents.length} events in view · period: {period === 'all' ? 'All time' : period === '30d' ? 'Last 30 days' : 'Last 7 days'}
+            {pluralize(filteredEvents.length, 'event')} in view · period: {period === 'all' ? 'All time' : period === '30d' ? 'Last 30 days' : 'Last 7 days'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.35rem' }}>
@@ -100,23 +97,11 @@ export function PerformanceAnalysis({ graph, events, kpis }: Props) {
       </div>
 
       {/* KPI Cards */}
-      <div className="kpi-strip" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
+      <StatGrid>
         {kpiCards.map(card => (
-          <div key={card.key} className="kpi-card" style={{ position: 'relative', overflow: 'hidden', minHeight: '120px' }}>
-            <span className="kpi-label">{card.label}</span>
-            <span className="kpi-value" style={{ fontSize: '1.8rem' }}>{card.value}</span>
-            <span className="kpi-sublabel">{card.sub}</span>
-            <svg
-              style={{ position: 'absolute', bottom: '0.5rem', right: '0.5rem', opacity: 0.3 }}
-              width="80"
-              height="36"
-              viewBox="0 0 80 36"
-            >
-              <path d={SPARKLINE_PATHS[card.sparkKey]} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" />
-            </svg>
-          </div>
+          <StatCard key={card.key} label={card.label} value={card.value} sublabel={card.sub} />
         ))}
-      </div>
+      </StatGrid>
 
       {/* Bottleneck Table */}
       <div className="card" style={{ marginBottom: '1.5rem' }}>

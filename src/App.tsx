@@ -3,6 +3,7 @@ import { EventDialog } from "./components/EventDialog";
 import { calculateKPIs } from "./lib/kpiEngine";
 import { DEFAULT_ALERT_RULES, evaluateAlerts } from "./lib/alertEngine";
 import { emitDemoEvent } from "./lib/demoProducer";
+import { pluralize } from "./lib/plural";
 import { OperationalOverview } from "./modules/OperationalOverview";
 import { ProcessExplorer } from "./modules/ProcessExplorer";
 import { ProcessVariants } from "./modules/ProcessVariants";
@@ -97,7 +98,7 @@ const NAV_ITEMS: Array<{ id: View; label: string; number: string; group: "primar
   { id: "improvements", label: "Process Enhancements", number: "03", group: "primary" },
   { id: "activity", label: "Evidence Log", number: "04", group: "primary" },
   { id: "resources", label: "Resource Usage", number: "05", group: "advanced" },
-  { id: "variants", label: "Variants", number: "06", group: "advanced" },
+  { id: "variants", label: "Process Variants", number: "06", group: "advanced" },
   { id: "performance", label: "Performance", number: "07", group: "advanced" },
   { id: "alerts", label: "Alerts", number: "08", group: "advanced" },
   { id: "analyst", label: "AI Insights", number: "09", group: "advanced" },
@@ -146,12 +147,24 @@ function overrideId(): string {
   return `override-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * Spec 010 FR-002: resource summaries read "human-time: 1 minutes" because the
+ * unit comes straight off the record. Singularise count nouns at render time
+ * only — currency and short unit codes ("USD", "ms") are left untouched, and
+ * the underlying event data is not modified.
+ */
+function inflectUnit(value: number | null, unit: string): string {
+  if (value !== 1) return unit;
+  if (unit.length > 3 && /^[a-z][a-z-]*[^s]s$/.test(unit)) return unit.slice(0, -1);
+  return unit;
+}
+
 function summarizeResources(event: WorkEvent): string | undefined {
   if (!event.resources?.length) return undefined;
   return event.resources
     .map((resource) => {
       const value = resource.value === null ? "unknown" : resource.value;
-      return `${resource.kind}: ${value} ${resource.unit}`;
+      return `${resource.kind}: ${value} ${inflectUnit(resource.value, resource.unit)}`;
     })
     .join("; ");
 }
@@ -407,7 +420,7 @@ export function App() {
       setView("explorer");
       setActivityLog(eventResult.data.events.map(toActivityLogEntry));
       setImportSummary(
-        `${label}: ${eventResult.acceptedCount} accepted, 0 rejected; ${inferred.variants.length} variants proposed.`,
+        `${label}: ${eventResult.acceptedCount} accepted, 0 rejected; ${pluralize(inferred.variants.length, "variant")} proposed.`,
       );
     } catch (error) {
       setIssues([
@@ -1057,7 +1070,7 @@ export function App() {
         </nav>
         <div className="sidebar-footer">
           <span className="dot" aria-hidden="true" />
-          <span>{events.events.length} events · local</span>
+          <span>{pluralize(events.events.length, "event")} · local</span>
         </div>
         <div style={{ padding: "0.5rem 0.75rem", display: "grid", gap: "0.4rem" }}>
           <button
@@ -1113,13 +1126,13 @@ export function App() {
                 )}
               </strong>
               <span>
-                {events.events.length} events · {graph.nodes.length} steps · schema v{events.schemaVersion}
+                {pluralize(events.events.length, "event")} · {pluralize(graph.nodes.length, "step")} · schema v{events.schemaVersion}
               </span>
             </div>
           </div>
           <div className="ws-actions">
             <span style={{ color: "var(--text-dim)", fontSize: "0.72rem" }}>
-              {graph.nodes.filter(n => n.status === "confirmed").length} confirmed · {overrides.length} overrides
+              {graph.nodes.filter(n => n.status === "confirmed").length} confirmed · {pluralize(overrides.length, "override")}
             </span>
             <button
               className="btn primary"

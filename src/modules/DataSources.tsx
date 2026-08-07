@@ -1,4 +1,5 @@
 import type { ActivityLogEntry, WorkEventCollection } from '../domain/types';
+import { StatCard, StatGrid } from '../components/StatCard';
 
 interface Props {
   events?: WorkEventCollection;
@@ -120,18 +121,11 @@ export function DataSources({
         <div className="card-header">
           <h3>Current Workspace</h3>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '1rem' }}>
-          {[
-            { label: 'Total Events', value: String(events?.events.length ?? 0) },
-            { label: 'Activity Log Entries', value: String(activityLog.length) },
-            { label: 'Schema Version', value: events?.schemaVersion ?? '—' },
-          ].map(stat => (
-            <div key={stat.label}>
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.68rem', marginBottom: '0.2rem' }}>{stat.label}</div>
-              <div style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '1.1rem' }}>{stat.value}</div>
-            </div>
-          ))}
-        </div>
+        <StatGrid columns={3}>
+          <StatCard label="Total Events" value={String(events?.events.length ?? 0)} />
+          <StatCard label="Evidence Log Entries" value={String(activityLog.length)} />
+          <StatCard label="Schema Version" value={events?.schemaVersion ?? '—'} />
+        </StatGrid>
         {events?.exportedAt && (
           <p style={{ color: 'var(--text-dim)', fontSize: '0.68rem', margin: '0.75rem 0 0' }}>
             Last imported: {new Date(events.exportedAt).toLocaleString()}

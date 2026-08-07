@@ -1,5 +1,17 @@
 import { useState } from 'react';
 import type { ActivityLogEntry } from '../domain/types';
+import { plural, pluralize } from '../lib/plural';
+
+/**
+ * Spec 010 FR-003: the log was 11 columns wide at 1440px, so every cell
+ * wrapped to three lines. Related fields are now paired into six columns and
+ * the repeated day stamp only prints when the day actually changes.
+ */
+function truncateSource(sourceRef: string): string {
+  const trimmed = sourceRef.replace(/[/\\]+$/, '');
+  const segments = trimmed.split(/[/\\]/);
+  return segments[segments.length - 1] || sourceRef;
+}
 
 export interface EvidenceFilter {
   eventIds: string[];
@@ -36,14 +48,14 @@ export function ActivityLog({ activityLog, onOpenEvent, evidenceFilter, onClearE
   return (
     <div className="module-content">
       <div className="module-heading">
-        <h2>Activity Log</h2>
-        <p>{activityLog.length} entries · {filtered.length} shown</p>
+        <h2>Evidence Log</h2>
+        <p>{pluralize(activityLog.length, 'entry', 'entries')} · {filtered.length} shown</p>
       </div>
 
       {evidenceFilter && (
         <div className="evidence-filter-banner" role="status">
           <span>
-            Showing <strong>{filtered.length}</strong> evidence record{filtered.length === 1 ? '' : 's'} for:{' '}
+            Showing <strong>{filtered.length}</strong> evidence {plural(filtered.length, 'record')} for:{' '}
             <strong>{evidenceFilter.label}</strong>
           </span>
           <button className="btn ghost" type="button" onClick={onClearEvidenceFilter}>
@@ -96,33 +108,37 @@ export function ActivityLog({ activityLog, onOpenEvent, evidenceFilter, onClearE
           <table className="data-table">
             <thead>
               <tr>
-                <th>Timestamp</th>
-                <th>Event ID</th>
-                <th>Case ID</th>
+                <th>Time</th>
+                <th>Event / case</th>
                 <th>Actor</th>
-                <th>System / model</th>
-                <th>Duration</th>
-                <th>Resources</th>
                 <th>Activity</th>
                 <th>Result</th>
-                <th>Truth</th>
-                <th>Source</th>
+                <th>Resources / source</th>
               </tr>
             </thead>
             <tbody>
-              {displayed.map(row => (
+              {displayed.map((row, index) => {
+                const ingested = new Date(row.ingestedAt);
+                const day = ingested.toLocaleDateString();
+                const previous = index > 0 ? displayed[index - 1] : null;
+                const isNewDay = !previous || new Date(previous.ingestedAt).toLocaleDateString() !== day;
+                const system = row.systemModel ?? row.systemTool ?? row.systemLabel;
+                const systemDetail = [row.systemTool, row.systemLabel].filter(Boolean).join(' · ');
+
+                return (
                 <tr
                   key={row.eventId}
                   className={`activity-log-row${row.isDemo ? ' is-demo' : ''}${evidenceIds?.has(row.eventId) ? ' evidence-hit' : ''}`}
                 >
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
-                    {new Date(row.ingestedAt).toLocaleTimeString()}
+                  <td className="log-cell-time">
+                    {isNewDay && <small className="log-day">{day}</small>}
+                    <span>{ingested.toLocaleTimeString()}</span>
                   </td>
-                  <td>
+                  <td className="log-cell-id">
                     <button
-                      className="btn ghost"
-                      style={{ padding: 0, fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--info)' }}
+                      className="btn ghost log-event-link"
                       type="button"
+                      title={row.eventId}
                       onClick={() => onOpenEvent(row.eventId)}
                     >
                       {row.eventId.slice(0, 14)}…
@@ -130,47 +146,40 @@ export function ActivityLog({ activityLog, onOpenEvent, evidenceFilter, onClearE
                     {row.isDemo && (
                       <span className="badge demo-badge" style={{ marginLeft: '0.35rem' }}>DEMO</span>
                     )}
+                    <small className="log-sub" title={row.caseId}>{row.caseId}</small>
                   </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    {row.caseId}
+                  <td className="log-cell-actor">
+                    <strong>{row.actorLabel || row.actorId}</strong>
+                    <small className="log-sub">{row.actorType} · {row.actorId}</small>
                   </td>
-                  <td>
-                    <strong style={{ fontSize: '0.75rem', color: 'var(--text)' }}>{row.actorLabel || row.actorId}</strong>
-                    <small style={{ display: 'block', color: 'var(--text-dim)' }}>{row.actorType} · {row.actorId}</small>
+                  <td className="log-cell-activity">
+                    <span>{row.activityLabel}</span>
+                    {system && <small className="log-sub">{system}{systemDetail ? ` · ${systemDetail}` : ''}</small>}
                   </td>
-                  <td style={{ maxWidth: '180px', wordBreak: 'break-word' }}>
-                    {row.systemModel || row.systemTool || row.systemLabel ? (
-                      <>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text)' }}>{row.systemModel ?? row.systemTool ?? row.systemLabel}</span>
-                        <small style={{ display: 'block', color: 'var(--text-dim)' }}>{[row.systemTool, row.systemLabel].filter(Boolean).join(' · ')}</small>
-                      </>
-                    ) : (
-                      <span style={{ color: 'var(--text-dim)' }}>-</span>
-                    )}
-                  </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    {row.durationMs !== undefined ? `${Math.round(row.durationMs / 1000)}s` : '-'}
-                  </td>
-                  <td style={{ maxWidth: '220px', wordBreak: 'break-word', fontSize: '0.68rem', color: 'var(--text-dim)' }}>
-                    {row.resourceSummary ?? '-'}
-                  </td>
-                  <td style={{ maxWidth: '200px', wordBreak: 'break-word' }}>{row.activityLabel}</td>
-                  <td>
+                  <td className="log-cell-result">
+                    <span
+                      className={`log-truth-dot truth-${row.truthState}`}
+                      title={`Truth state: ${row.truthState}`}
+                      aria-label={`Truth state: ${row.truthState}`}
+                    />
                     <span style={{
                       color: row.resultStatus === 'success' ? 'var(--success)' :
                         ['failure', 'exception'].includes(row.resultStatus) ? 'var(--danger)' :
                           'var(--warning)',
-                      fontSize: '0.78rem',
                     }}>
                       {row.resultStatus}
                     </span>
+                    <small className="log-sub">
+                      {row.durationMs !== undefined ? `${Math.round(row.durationMs / 1000)}s` : '—'}
+                    </small>
                   </td>
-                  <td style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{row.truthState}</td>
-                  <td style={{ fontSize: '0.68rem', color: 'var(--text-dim)', maxWidth: '180px', wordBreak: 'break-all' }}>
-                    {row.sourceRef}
+                  <td className="log-cell-resources">
+                    <span title={row.resourceSummary}>{row.resourceSummary ?? '—'}</span>
+                    <small className="log-sub" title={row.sourceRef}>{truncateSource(row.sourceRef)}</small>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

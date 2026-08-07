@@ -1,4 +1,5 @@
 import type { Alert, KPISnapshot, ProcessGraph, Recommendation, WorkEvent } from '../domain/types';
+import { pluralize } from '../lib/plural';
 
 interface Props {
   graph?: ProcessGraph;
@@ -84,7 +85,7 @@ export function OperationalOverview({
                 <span className="loop-index">{String(index + 1).padStart(2, '0')}</span>
                 <div>
                   <strong>{node.label}</strong>
-                  <span>{node.frequency} runs · {node.actorTypes.join(', ') || 'actor unknown'}</span>
+                  <span>{pluralize(node.frequency, 'run')} · {node.actorTypes.join(', ') || 'actor unknown'}</span>
                 </div>
               </li>
             ))}
@@ -130,7 +131,7 @@ export function OperationalOverview({
         <article className="kpi-card">
           <span className="kpi-label">Truth Confirmed</span>
           <span className="kpi-value">{healthPct}%</span>
-          <span className="kpi-sublabel">{confirmedNodes} of {totalNodes} steps</span>
+          <span className="kpi-sublabel">{confirmedNodes} of {pluralize(totalNodes, 'step')}</span>
         </article>
       </div>
 
@@ -185,7 +186,7 @@ export function OperationalOverview({
           Manage data
         </button>
         <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>
-          {events.length} events · schema v1.0.0
+          {pluralize(events.length, 'event')} · schema v1.0.0
         </span>
       </div>
     </div>

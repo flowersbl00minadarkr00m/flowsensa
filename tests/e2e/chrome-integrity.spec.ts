@@ -34,8 +34,9 @@ test("risk evidence drills through to a filtered Evidence Log", async ({ page })
   const count = Number((await evidenceButton.innerText()).match(/\((\d+)\)/)?.[1]);
   await evidenceButton.click();
 
-  // Landed on Activity Log, filtered to exactly the linked records.
-  await expect(page.getByRole("heading", { name: "Activity Log" })).toBeVisible();
+  // Landed on the Evidence Log, filtered to exactly the linked records.
+  // Spec 010 FR-005: the page title matches the "Evidence Log" nav label.
+  await expect(page.getByRole("heading", { name: "Evidence Log" })).toBeVisible();
   const banner = page.locator(".evidence-filter-banner");
   await expect(banner).toBeVisible();
   await expect(banner).toContainText("risk");

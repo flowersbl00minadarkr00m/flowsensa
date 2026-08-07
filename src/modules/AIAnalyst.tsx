@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AnalystView } from '../components/AnalystView';
 import { sendAnalystQuery } from '../lib/openrouterClient';
+import { pluralize } from '../lib/plural';
 import type { AnalystAnswer, Gap, KPISnapshot, LLMProfile, ProcessGraph, Recommendation, WorkEvent } from '../domain/types';
 
 interface ConversationMessage {
@@ -126,9 +127,9 @@ export function AIAnalyst({
           <>
             <div className="ai-context-strip">
               <span>Bound context</span>
-              <strong>{events.length} events</strong>
-              <strong>{kpis.caseCount} cases</strong>
-              <strong>{recommendations.length} enhancements</strong>
+              <strong>{pluralize(events.length, 'event')}</strong>
+              <strong>{pluralize(kpis.caseCount, 'case')}</strong>
+              <strong>{pluralize(recommendations.length, 'enhancement')}</strong>
               <small>{llmProfile.model}</small>
             </div>
 

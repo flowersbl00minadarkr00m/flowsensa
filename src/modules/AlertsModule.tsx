@@ -26,7 +26,7 @@ export function AlertsModule({ alerts, onUpdate }: Props) {
         <p>{active.length} active · {history.length} in history</p>
       </div>
 
-      <div className="tab-bar" style={{ padding: 0, marginBottom: '1rem', background: 'transparent', borderBottom: '1px solid var(--border)' }}>
+      <div className="tab-bar inline">
         <button
           className={`tab-btn${tab === 'active' ? ' active' : ''}`}
           type="button"

@@ -2563,3 +2563,246 @@ th { color: #8b8997; background: #faf9fc; }
     color: #7455e7;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Spec 010 — UX polish: design-system unification & content fixes
+   Appended last so these rules win over the earlier dark-theme
+   defaults and the light-theme override block above.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── FR-004: one type scale inside the app shell ───────────────
+   Page title 32px, section heading 20px, card title 16px. The
+   oversized display clamps (h1 up to 5.6rem, h2 up to 2.8rem)
+   stay scoped to the marketing/landing shell, which is where
+   they were designed to be read. */
+.app-shell h1,
+.app-shell .settings-title h1,
+.app-shell .module-heading h2 {
+  max-width: none;
+  margin: 0 0 0.3rem;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.app-shell h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+.app-shell h3,
+.app-shell .card-header h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.app-shell .card-header h3 { margin-bottom: 0; }
+
+.app-shell h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.settings-title {
+  padding: 1.1rem 1.5rem 0.6rem;
+}
+
+/* "Settings" is the page title, so each tab's own heading drops to the
+   section level rather than repeating it at page size. */
+.app-shell .settings-body .module-heading h2,
+.app-shell .settings-body .section-heading h2 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+/* ── FR-006: native form controls follow the app's input styling ── */
+.app-shell select {
+  min-height: 2.15rem;
+  padding: 0.45rem 2rem 0.45rem 0.6rem;
+  border: 1px solid #dcd9e3;
+  border-radius: var(--radius, 8px);
+  color: #2f2e3c;
+  background-color: #fbfafd;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%237657e8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.app-shell select:disabled {
+  color: #8a869a;
+  background-color: #f2f1f6;
+  cursor: not-allowed;
+}
+
+.app-shell input[type="range"] {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.app-shell input[type="checkbox"],
+.app-shell input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+/* ── FR-007: one tab component ──────────────────────────────────
+   The active underline used to sit 1px below the bar via a
+   negative margin, so any clipping ancestor sliced it off. It is
+   drawn inside the button box now. */
+.tab-bar {
+  align-items: flex-end;
+}
+
+.tab-btn {
+  margin-bottom: 0;
+  border-bottom-width: 2px;
+}
+
+/* Inline variant (Alerts) — same component, no chrome band. */
+.tab-bar.inline {
+  padding: 0;
+  margin-bottom: 1rem;
+  background: transparent;
+}
+
+/* ── FR-007: one stat/KPI card ─────────────────────────────────── */
+.app-shell .kpi-card {
+  min-height: 96px;
+  padding: 1.25rem 1.5rem;
+  justify-content: flex-start;
+}
+
+.app-shell .kpi-card .kpi-value {
+  font-size: 1.75rem;
+}
+
+.app-shell .kpi-card .kpi-spark {
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+/* ── FR-003: Evidence Log at six legible columns ───────────────── */
+.activity-log-row td {
+  vertical-align: top;
+}
+
+.activity-log-row .log-sub {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-cell-time {
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.log-cell-time .log-day {
+  display: block;
+  margin-bottom: 0.1rem;
+  color: var(--accent);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.log-cell-id { max-width: 190px; }
+.log-cell-actor { max-width: 190px; }
+.log-cell-activity { max-width: 240px; }
+.log-cell-result { white-space: nowrap; }
+.log-cell-resources { max-width: 240px; }
+
+.log-cell-id .log-event-link {
+  padding: 0;
+  color: var(--info);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.log-cell-id .log-sub,
+.log-cell-actor .log-sub {
+  font-family: var(--font-mono);
+}
+
+.log-cell-activity > span,
+.log-cell-resources > span {
+  display: block;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Truth state demoted from a full column to a row-level dot. */
+.log-truth-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: #9a97a8;
+}
+
+.log-truth-dot.truth-observed { background: #3f76c9; }
+.log-truth-dot.truth-inferred { background: #7657d6; }
+.log-truth-dot.truth-user-confirmed { background: #237e61; }
+.log-truth-dot.truth-overridden { background: #8a4ead; }
+
+/* ── FR-009: no fade over "Save and connect" ────────────────────
+   Live DOM inspection (Playwright, 1440×900, Settings → LLM
+   Profiles) found no scrim, mask, or gradient overlay: .settings-
+   body does not even overflow (scrollHeight === clientHeight).
+   The "permanent fade" was two real low-contrast rules stacking
+   in the bottom band:
+     1. `details > summary { color: #dce5eb }` — a dark-theme
+        colour never overridden for the light theme, so the
+        disclosure summary rendered near-white on near-white.
+     2. `.btn:disabled { opacity: 0.4 }` — a second, washed-out
+        disabled treatment sitting next to the primary button's
+        explicit disabled tokens (P0-4, 2026-08-06). */
+.app-shell details > summary {
+  color: #4a4657;
+  font-weight: 600;
+}
+
+.app-shell details > summary:hover {
+  color: var(--accent);
+}
+
+.app-shell .btn:disabled,
+.app-shell button:disabled {
+  opacity: 1;
+  color: #6b6480;
+  border-color: #d7d1ea;
+  background: #e9e6f5;
+  cursor: not-allowed;
+}
+
+.app-shell .btn.ghost:disabled,
+.app-shell button.ghost:disabled {
+  border-color: transparent;
+  background: transparent;
+}

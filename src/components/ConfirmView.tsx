@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { pluralize } from "../lib/plural";
 import type {
   GraphEdge,
   GraphNode,
@@ -271,7 +272,7 @@ export function ConfirmView({
               {graph.edges.map((edge) => (
                 <tr key={edge.id}>
                   <td>{edge.from} → {edge.to}</td>
-                  <td>{edge.frequency} observations</td>
+                  <td>{pluralize(edge.frequency, "observation")}</td>
                   <td><TruthBadge state={edge.truthState} /></td>
                   <td>
                     <div className="button-row compact">
@@ -308,7 +309,7 @@ export function ConfirmView({
         </div>
       </div>
       <details className="panel">
-        <summary>Override ledger · {overrides.length} records</summary>
+        <summary>Override ledger · {pluralize(overrides.length, "record")}</summary>
         <ul className="record-list">
           {overrides.map((override) => (
             <li key={override.id}>

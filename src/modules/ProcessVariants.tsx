@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { ProcessGraph, WorkEvent } from '../domain/types';
+import { plural, pluralize } from '../lib/plural';
 
 interface Props {
   graph?: ProcessGraph;
@@ -65,7 +66,7 @@ export function ProcessVariants({ graph, events }: Props) {
     <div className="module-content">
       <div className="module-heading">
         <h2>Process Variants</h2>
-        <p>{rows.length} variant{rows.length !== 1 ? 's' : ''} discovered across {events.length} events.</p>
+        <p>{pluralize(rows.length, 'variant')} discovered across {pluralize(events.length, 'event')}.</p>
       </div>
 
       {/* Desktop table */}
@@ -83,9 +84,8 @@ export function ProcessVariants({ graph, events }: Props) {
           </thead>
           <tbody>
             {rows.map(({ v, path, exceptionPct, acceptedPct, medianDuration }) => (
-              <>
+              <Fragment key={v.id}>
                 <tr
-                  key={v.id}
                   style={{ cursor: 'pointer' }}
                   onClick={() => setExpandedId(expandedId === v.id ? null : v.id)}
                 >
@@ -117,7 +117,7 @@ export function ProcessVariants({ graph, events }: Props) {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -135,7 +135,7 @@ export function ProcessVariants({ graph, events }: Props) {
               <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0, flexWrap: 'wrap' }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)', fontSize: '0.9rem' }}>{v.caseIds.length}</div>
-                  <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>cases</div>
+                  <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>{plural(v.caseIds.length, 'case')}</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', color: parseFloat(exceptionPct) > 10 ? 'var(--danger)' : 'var(--text)', fontSize: '0.9rem' }}>{exceptionPct}%</div>

@@ -107,6 +107,11 @@ export function SettingsModule({
 
   return (
     <div className="module-content settings-shell">
+      {/* Spec 010 FR-005: the "Settings" nav item previously landed on a page
+          whose only heading was the active tab's own title. */}
+      <div className="settings-title">
+        <h1>Settings</h1>
+      </div>
       <div className="tab-bar">
         {(['llm', 'registry', 'export', 'workspace'] as const).map(t => (
           <button key={t} className={`tab-btn${tab === t ? ' active' : ''}`} type="button" onClick={() => setTab(t)}>
