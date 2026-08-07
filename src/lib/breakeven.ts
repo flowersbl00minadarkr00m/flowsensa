@@ -179,16 +179,21 @@ export function buildVerdict(baseline: CostBaseline, a: SelfHostAssumptions): st
   // denominator is, not a real cost difference (see 2026-08-06 UX review).
   const NEGLIGIBLE_MONTHLY_COST = 0.5;
   const MAX_DISPLAYED_RATIO = 100;
-  function describeRatio(bigger: number, smaller: number): string {
-    if (smaller < NEGLIGIBLE_MONTHLY_COST) return "not meaningful at this volume";
+  // Returns a full clause, e.g. "frontier pricing is ~3.2x cheaper" or
+  // "the cost difference is not meaningful at this volume" — callers must
+  // not append "cheaper" themselves, or the near-zero-cost case reads as
+  // grammatical nonsense ("...not meaningful at this volume cheaper").
+  function describeCostComparison(cheaperLabel: string, bigger: number, smaller: number): string {
+    if (smaller < NEGLIGIBLE_MONTHLY_COST) return "the cost difference is not meaningful at this volume";
     const ratio = bigger / smaller;
-    return ratio > MAX_DISPLAYED_RATIO ? `> ${MAX_DISPLAYED_RATIO}x` : `~${ratio.toFixed(1)}x`;
+    const ratioText = ratio > MAX_DISPLAYED_RATIO ? `> ${MAX_DISPLAYED_RATIO}x` : `~${ratio.toFixed(1)}x`;
+    return `${cheaperLabel} is ${ratioText} cheaper`;
   }
   if (frontier < selfHosted) {
     const cross = crossover === null
       ? "no breakeven at these assumptions"
       : `breakeven near ${fmtTokens(crossover)} tokens/month at ${Math.round(a.utilization * 100)}% utilization`;
-    return `At ${volume} tokens/month with ${usage} usage, frontier pricing is ${describeRatio(selfHosted, frontier)} cheaper; ${cross}.`;
+    return `At ${volume} tokens/month with ${usage} usage, ${describeCostComparison("frontier pricing", selfHosted, frontier)}; ${cross}.`;
   }
-  return `At ${volume} tokens/month with ${usage} usage, self-hosted compute is ${describeRatio(frontier, selfHosted)} cheaper at these assumptions; below ${crossover === null ? "current volume" : `${fmtTokens(crossover)} tokens/month`} frontier pricing wins.`;
+  return `At ${volume} tokens/month with ${usage} usage, ${describeCostComparison("self-hosted compute", frontier, selfHosted)} at these assumptions; below ${crossover === null ? "current volume" : `${fmtTokens(crossover)} tokens/month`} frontier pricing wins.`;
 }
