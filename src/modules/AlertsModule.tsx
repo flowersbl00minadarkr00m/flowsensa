@@ -111,7 +111,7 @@ export function AlertsModule({ alerts, onUpdate }: Props) {
       <div className="card">
         <div className="card-header">
           <h3>Alert Rules</h3>
-          <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>Default rules (read-only MVP)</span>
+          <span style={{ color: 'var(--text-dim)', fontSize: '0.72rem' }}>Default rules · read-only</span>
         </div>
         <div style={{ display: 'grid', gap: '0.6rem' }}>
           {DEFAULT_ALERT_RULES.map(rule => (

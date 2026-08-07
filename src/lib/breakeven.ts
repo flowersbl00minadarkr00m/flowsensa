@@ -174,13 +174,21 @@ export function buildVerdict(baseline: CostBaseline, a: SelfHostAssumptions): st
   const crossover = breakevenVolume(rate, a);
   const usage = baseline.burstiness >= 1.5 ? "spiky" : "steady";
   const volume = fmtTokens(baseline.monthlyTokens);
+  // Below this monthly cost, a ratio against the other side is not a
+  // meaningful comparison — it just measures how close to zero the
+  // denominator is, not a real cost difference (see 2026-08-06 UX review).
+  const NEGLIGIBLE_MONTHLY_COST = 0.5;
+  const MAX_DISPLAYED_RATIO = 100;
+  function describeRatio(bigger: number, smaller: number): string {
+    if (smaller < NEGLIGIBLE_MONTHLY_COST) return "not meaningful at this volume";
+    const ratio = bigger / smaller;
+    return ratio > MAX_DISPLAYED_RATIO ? `> ${MAX_DISPLAYED_RATIO}x` : `~${ratio.toFixed(1)}x`;
+  }
   if (frontier < selfHosted) {
-    const ratio = selfHosted / Math.max(frontier, 0.01);
     const cross = crossover === null
       ? "no breakeven at these assumptions"
       : `breakeven near ${fmtTokens(crossover)} tokens/month at ${Math.round(a.utilization * 100)}% utilization`;
-    return `At ${volume} tokens/month with ${usage} usage, frontier pricing is ~${ratio.toFixed(1)}x cheaper; ${cross}.`;
+    return `At ${volume} tokens/month with ${usage} usage, frontier pricing is ${describeRatio(selfHosted, frontier)} cheaper; ${cross}.`;
   }
-  const ratio = frontier / Math.max(selfHosted, 0.01);
-  return `At ${volume} tokens/month with ${usage} usage, self-hosted compute is ~${ratio.toFixed(1)}x cheaper at these assumptions; below ${crossover === null ? "current volume" : `${fmtTokens(crossover)} tokens/month`} frontier pricing wins.`;
+  return `At ${volume} tokens/month with ${usage} usage, self-hosted compute is ${describeRatio(frontier, selfHosted)} cheaper at these assumptions; below ${crossover === null ? "current volume" : `${fmtTokens(crossover)} tokens/month`} frontier pricing wins.`;
 }

@@ -1016,7 +1016,7 @@ export function App() {
           type="button"
           onClick={moreSheetOpen ? closeMoreSheet : openMoreSheet}
         >
-          <span className="bottom-tab-icon" aria-hidden="true">â‹¯</span>
+          <span className="bottom-tab-icon" aria-hidden="true">⋯</span>
           More
         </button>
       </nav>
