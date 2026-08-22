@@ -1,12 +1,10 @@
 /**
- * Sync process telemetry from the Supabase `telemetry_events` table that
- * Flowsensa shares with FindMnemo. Rows are mapped into the canonical
+ * Convert explicitly exported FindMnemo telemetry rows into the canonical
  * WorkEvent schema (schema v1.0.0). The schema is strict
  * (additionalProperties: false), so every nested object is rebuilt from only
  * the fields the schema allows, and optional sub-objects are omitted unless
  * they satisfy their required shape — the import validator is the final gate.
  */
-import { supabase } from './supabase';
 import { validatePersonalOntologyBundle } from '@henry/personal-ontology';
 import type { WorkEventCollection } from '../domain/types';
 
@@ -257,7 +255,7 @@ export function formatFindMnemoImportLabel(result: SyncResult): string {
   const compatibilityLabel = result.metadata.compatibilityMode === 'mnemosync-legacy-compatible'
     ? '; legacy mnemosync-compatible'
     : '; current producer metadata';
-  return `${result.metadata.producerName} sync (${countLabel}${versionLabel}${compatibilityLabel})`;
+  return `${result.metadata.producerName} import (${countLabel}${versionLabel}${compatibilityLabel})`;
 }
 
 /**
@@ -277,28 +275,4 @@ export function assertSupportedTelemetryImport(input: unknown): void {
   throw new Error(
     `${String(input.bundleProfile)} is not a work-event import. Import a validated FindMnemo WorkEventCollection instead.`,
   );
-}
-
-/**
- * Pull telemetry events from the shared Supabase table and return a canonical
- * WorkEventCollection. Ordered by case then sequence/time so process discovery
- * sees coherent traces.
- */
-export async function syncFromFindMnemo(): Promise<SyncResult> {
-  const { data, error } = await supabase
-    .from('telemetry_events')
-    .select('*')
-    .order('case_id', { ascending: true })
-    .order('sequence', { ascending: true })
-    .order('timestamp', { ascending: true });
-
-  if (error) {
-    throw new Error(`FindMnemo sync failed: ${error.message}`);
-  }
-  const rows = (data ?? []) as Row[];
-  if (rows.length === 0) {
-    throw new Error('No telemetry events found in the shared FindMnemo table.');
-  }
-
-  return createFindMnemoImport(rows);
 }

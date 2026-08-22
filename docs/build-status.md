@@ -20,7 +20,7 @@ FindMnemo export.
 
 ## Deliberately separate
 
-- Primary event capture remains in `C:\Users\henry\mnemosync`.
+- Primary event capture remains in the separately installed FindMnemo project.
 - Token/cost and utility analysis remains in
-  `C:\Users\henry\OneDrive\Documents\Chief of Staff\project\localcfo`.
+  the separately installed LocalCFO project.
 - Elastic/OpenTelemetry remains optional adapter infrastructure.

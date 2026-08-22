@@ -37,7 +37,7 @@ describe('FindMnemo import metadata', () => {
       compatibilityMode: 'mnemosync-legacy-compatible',
     });
     expect(formatFindMnemoImportLabel(result)).toBe(
-      'FindMnemo sync (1 event; producer v0.1.0; legacy mnemosync-compatible)',
+      'FindMnemo import (1 event; producer v0.1.0; legacy mnemosync-compatible)',
     );
 
     const event = result.collection.events[0];
