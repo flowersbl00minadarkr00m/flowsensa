@@ -7,16 +7,16 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint src tests",
-    "test": "vitest run tests/domain.test.ts tests/breakeven.test.ts tests/mapLayout.test.ts tests/reportExport.test.ts",
+    "test": "vitest run tests/domain.test.ts tests/breakeven.test.ts tests/mapLayout.test.ts tests/reportExport.test.ts tests/findmnemo-telemetry.test.ts tests/llm-proxy-security.test.ts",
     "test:e2e": "playwright test",
     "preview": "vite preview"
   },
   "dependencies": {
     "@henry/personal-ontology": "file:packages/personal-ontology",
-    "@supabase/supabase-js": "^2.110.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "dagre": "^0.8.5",
+    "ipaddr.js": "^2.5.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

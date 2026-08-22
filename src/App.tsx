@@ -68,8 +68,6 @@ import primitiveFixture from "./fixtures/work-primitives.json";
 import { showcaseWorkEvents } from "./fixtures/showcase-work-events";
 import {
   assertSupportedTelemetryImport,
-  formatFindMnemoImportLabel,
-  syncFromFindMnemo,
 } from "./lib/findMnemoTelemetry";
 
 type View =
@@ -226,7 +224,6 @@ export function App() {
   const moreSheetRef = useRef<HTMLDivElement>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [alertUpdates, setAlertUpdates] = useState<Map<string, Alert["status"]>>(new Map());
-  const [syncing, setSyncing] = useState(false);
   const workspaceFileInputRef = useRef<HTMLInputElement>(null);
 
   const gaps = useMemo(
@@ -465,19 +462,6 @@ export function App() {
 
     await importPayload(text, file.name);
   }, [importPayload, llmProfile]);
-
-  const handleSyncFindMnemo = useCallback(async () => {
-    setSyncing(true);
-    setImportSummary("Syncing telemetry from FindMnemo...");
-    try {
-      const result = await syncFromFindMnemo();
-      await importPayload(result.collection, formatFindMnemoImportLabel(result));
-    } catch (error) {
-      setImportSummary((error as Error).message);
-    } finally {
-      setSyncing(false);
-    }
-  }, [importPayload]);
 
   const handleRunDemo = useCallback(() => {
     const event = emitDemoEvent(demoCounter);
@@ -1136,20 +1120,11 @@ export function App() {
             </span>
             <button
               className="btn primary"
-              style={{ fontSize: "0.72rem", padding: "0.3rem 0.7rem" }}
-              type="button"
-              onClick={() => void handleSyncFindMnemo()}
-              disabled={syncing}
-            >
-              {syncing ? "Syncing..." : "Sync with FindMnemo"}
-            </button>
-            <button
-              className="btn ghost"
               style={{ fontSize: "0.72rem", padding: "0.3rem 0.6rem" }}
               type="button"
               onClick={() => workspaceFileInputRef.current?.click()}
             >
-              Import process
+              Import process file
             </button>
           </div>
         </header>
