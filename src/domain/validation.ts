@@ -1,7 +1,8 @@
-import Ajv2020, { type ErrorObject } from "ajv/dist/2020";
-import addFormats from "ajv-formats";
-import workEventSchema from "../schemas/work-event.schema.json";
-import workPrimitivesSchema from "../schemas/work-primitives.schema.json";
+import type { ErrorObject, ValidateFunction } from "ajv";
+import {
+  validatePrimitiveRegistry as generatedValidatePrimitiveRegistry,
+  validateWorkEvents as generatedValidateWorkEvents,
+} from "../generated/validators";
 import type { PrimitiveRegistry, WorkEventCollection } from "./types";
 
 export interface ValidationIssue {
@@ -19,11 +20,8 @@ export interface ValidationResult<T> {
   rejectedCount: number;
 }
 
-const ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
-addFormats(ajv);
-
-const validateEventsSchema = ajv.compile(workEventSchema);
-const validatePrimitivesSchema = ajv.compile(workPrimitivesSchema);
+const validateEventsSchema = generatedValidateWorkEvents as ValidateFunction<WorkEventCollection>;
+const validatePrimitivesSchema = generatedValidatePrimitiveRegistry as ValidateFunction<PrimitiveRegistry>;
 
 function eventIndexFromPath(path: string): number | undefined {
   const match = path.match(/^\/events\/(\d+)/);
