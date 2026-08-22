@@ -33,5 +33,7 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Check strict CSP compatibility
+        run: npm run check:csp-bundle
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
